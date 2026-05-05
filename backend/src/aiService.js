@@ -28,6 +28,7 @@ Yêu cầu về mã nguồn:
 3. Code KHÔNG chạy ngầm headless để người dùng có thể nhìn thấy tiến độ (đừng chặn headless trừ khi cần). Nhưng hiện tại cứ để có giao diện UI.
 4. Có assertion (dùng require('assert') có sẵn của Node) để kiểm tra kết quả kỳ vọng.
 5. Code chỉ chứa mã Javascript hợp lệ để chạy, KHÔNG CÓ giải thích dài dòng dư thừa ngoài các comment trong code. Không bọc trong block markdown \`\`\`javascript nếu bạn có thể trả về text thuần tuý dễ parse, nhưng nếu khó thì tôi sẽ parse sau. Tốt nhất là BỌC trong \`\`\`javascript và \`\`\`
+6. LƯU Ý QUAN TRỌNG: Chỉ sử dụng các hàm hỗ trợ của Selenium WebDriver JS (như until.elementLocated, until.urlIs, until.urlMatches, until.urlContains, until.stalenessOf). TUYỆT ĐỐI KHÔNG tự bịa ra các hàm không tồn tại như until.urlIsNot. Nếu cần chờ URL thay đổi, hãy dùng driver.wait(async () => { return await driver.getCurrentUrl() !== initialUrl; }, 10000).
 
 Mã script gợi ý tiêu chuẩn:
 \`\`\`javascript

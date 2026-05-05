@@ -1,13 +1,18 @@
 const { Builder, By, until } = require('selenium-webdriver');
+const chrome = require('selenium-webdriver/chrome');
 
 /**
  * Khởi tạo Selenium WebDriver hiện ẩn (headless Chrome)
  * Trích xuất cấu trúc HTML để gửi cho AI
  */
 async function extractPageStructure(url) {
-  let driver = await new Builder().forBrowser('chrome').setChromeOptions(
-    require('selenium-webdriver/chrome').Options().addArguments('--headless', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage')
-  ).build();
+  let options = new chrome.Options();
+  options.addArguments('--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage');
+
+  let driver = await new Builder()
+    .forBrowser('chrome')
+    .setChromeOptions(options)
+    .build();
 
   try {
     await driver.get(url);
