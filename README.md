@@ -24,7 +24,7 @@ An AI-powered GUI platform for managing and automating tests with Katalon integr
 ## Architecture Overview
 
 ```
-Yetiforce-GUI/
+QA-Studio/
 ├── frontend/        # React + Vite (port 5173)
 ├── backend/         # Express + PostgreSQL + Selenium/WebSocket (port 5000)
 ├── docker-compose.yml
