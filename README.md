@@ -1,4 +1,4 @@
-# Yetiforce-GUI
+# QA Studio
 
 An AI-powered GUI platform for managing and automating tests with Katalon integration. The platform allows importing Katalon projects, managing test suites/cases, running Selenium-based tests, and generating Groovy automation scripts via Google Gemini AI.
 
