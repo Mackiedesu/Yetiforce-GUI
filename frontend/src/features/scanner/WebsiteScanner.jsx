@@ -141,7 +141,7 @@ function ScriptPanel({ script }) {
     <div className="scanner-artifact-panel">
       <div className="scanner-artifact-header">
         <Code2 size={15} />
-        <span>Katalon Groovy Script</span>
+        <span>Playwright Script</span>
         <div style={{ flex: 1 }} />
         <CopyButton text={script} />
       </div>
@@ -217,7 +217,7 @@ export default function WebsiteScanner() {
           <span className="scanner-feature-badge">Feature 8</span>
         </div>
         <p className="scanner-header-desc">
-          Crawl bất kỳ trang web nào, trích xuất phần tử DOM và tự động sinh Katalon Object Repository + Groovy Script bằng AI.
+          Crawl bất kỳ trang web nào, trích xuất phần tử DOM và tự động sinh Playwright test scripts + Object Locators bằng AI.
         </p>
       </div>
 
@@ -289,7 +289,7 @@ export default function WebsiteScanner() {
               disabled={genLoading}
             >
               {genLoading ? <Loader2 size={14} className="scanner-spin" /> : <Zap size={14} />}
-              {genLoading ? 'Generating…' : 'Generate Katalon Artifacts'}
+              {genLoading ? 'Generating…' : 'Generate Test Artifacts'}
             </button>
           </div>
 
@@ -313,7 +313,7 @@ export default function WebsiteScanner() {
                   className={`scanner-tab ${activeTab === 'script' ? 'active' : ''}`}
                   onClick={() => setActiveTab('script')}
                 >
-                  Groovy Script
+                  Playwright Script
                 </button>
               </>
             )}
@@ -330,7 +330,7 @@ export default function WebsiteScanner() {
           {genLoading && (
             <div className="scanner-gen-loading">
               <Loader2 size={22} className="scanner-spin" style={{ color: '#7c3aed' }} />
-              <span>AI đang phân tích và sinh Katalon artifacts…</span>
+              <span>AI đang phân tích và sinh test artifacts…</span>
             </div>
           )}
         </div>

@@ -1,6 +1,10 @@
 const { randomUUID } = require('crypto');
 
 const { pool, query } = require('../../../config/database');
+const {
+  replaceTestCaseSteps,
+  replaceTestCaseDataSets,
+} = require('../../test-cases/infrastructure/testCase.repository.pg');
 
 function createValidationError(message) {
   const error = new Error(message);
@@ -11,6 +15,14 @@ function createValidationError(message) {
 async function projectExists(projectId) {
   const result = await query('SELECT 1 FROM projects WHERE id = $1 LIMIT 1', [projectId]);
   return result.rowCount > 0;
+}
+
+async function getProjectPath(projectId) {
+  const result = await query(
+    'SELECT katalon_project_path FROM projects WHERE id = $1 LIMIT 1',
+    [projectId]
+  );
+  return result.rows[0]?.katalon_project_path || null;
 }
 
 async function suiteExists(client, projectId, suiteId) {
@@ -35,9 +47,11 @@ async function createReusableTestCase(client, projectId, payload) {
       payload.description || null,
       payload.expected_result || null,
       payload.script || null,
-      payload.url || null
+      payload.url || null,
     ]
   );
+  await replaceTestCaseSteps(client, testCaseId, payload.steps || []);
+  await replaceTestCaseDataSets(client, testCaseId, payload.data_sets || []);
   return testCaseId;
 }
 
@@ -267,13 +281,15 @@ async function updateTestCase(projectId, suiteId, testCaseId, payload) {
           payload.description || null,
           payload.expected_result || null,
           payload.script || null,
-          payload.url || null
+          payload.url || null,
         ]
       );
       if (updateResult.rowCount === 0) {
         await client.query('ROLLBACK');
         return false;
       }
+      await replaceTestCaseSteps(client, testCaseId, payload.steps || []);
+      await replaceTestCaseDataSets(client, testCaseId, payload.data_sets || []);
     }
 
     await client.query('COMMIT');
@@ -373,6 +389,7 @@ async function reorderTestCases(projectId, suiteId, orderItems) {
 
 module.exports = {
   projectExists,
+  getProjectPath,
   listSuitesByProject,
   getSuiteById,
   createSuite,

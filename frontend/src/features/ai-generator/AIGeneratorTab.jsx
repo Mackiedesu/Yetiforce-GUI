@@ -14,7 +14,7 @@ const OUTPUT_TABS = [
   { id: 'steps', label: 'Test Steps', icon: ClipboardList },
   { id: 'results', label: 'Expected Results', icon: Target },
   { id: 'data', label: 'Test Data', icon: Database },
-  { id: 'script', label: 'Katalon Script', icon: Code2 },
+  { id: 'script', label: 'Playwright Script', icon: Code2 },
 ];
 
 const SkeletonLine = ({ width = '100%' }) => (
@@ -242,7 +242,7 @@ const AIGeneratorTab = ({ onGenerate, isGenerating, result, error }) => {
                 <div className="ai-gen-feature-chip"><ClipboardList size={13} /> Test Steps</div>
                 <div className="ai-gen-feature-chip"><Target size={13} /> Expected Results</div>
                 <div className="ai-gen-feature-chip"><Database size={13} /> Test Data</div>
-                <div className="ai-gen-feature-chip"><Code2 size={13} /> Katalon Groovy Script</div>
+                <div className="ai-gen-feature-chip"><Code2 size={13} /> Playwright Script</div>
               </div>
             </div>
           )}
@@ -256,7 +256,7 @@ const AIGeneratorTab = ({ onGenerate, isGenerating, result, error }) => {
                 </div>
                 <div>
                   <p className="ai-gen-loading-title">AI đang phân tích yêu cầu...</p>
-                  <p className="ai-gen-loading-sub">Đang tạo test steps, expected results và Katalon script</p>
+                  <p className="ai-gen-loading-sub">Đang tạo test steps, expected results và Playwright script</p>
                 </div>
               </div>
               <LoadingSkeleton />
@@ -342,14 +342,14 @@ const AIGeneratorTab = ({ onGenerate, isGenerating, result, error }) => {
                 </div>
               )}
 
-              {/* Katalon Script */}
+              {/* Playwright Script */}
               {activeOutputTab === 'script' && (
                 <div className="ai-gen-section ai-gen-script-section">
                   <div className="ai-gen-section-header">
                     <Code2 size={15} />
-                    <span>Katalon Groovy Script</span>
+                    <span>Playwright Script</span>
                     <div className="ai-gen-script-actions">
-                      <span className="ai-gen-lang-badge">Groovy</span>
+                      <span className="ai-gen-lang-badge">JavaScript</span>
                       <button
                         id="ai-gen-copy-btn"
                         className={`ai-gen-copy-btn ${copied ? 'copied' : ''}`}

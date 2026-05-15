@@ -87,14 +87,37 @@ function BarTooltip({ active, payload, label }) {
       borderRadius: 8,
       padding: '8px 12px',
       fontSize: '0.8rem',
+      maxWidth: 280,
     }}>
-      <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>{label}</div>
+      <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)', wordBreak: 'break-word' }}>{label}</div>
       {payload.map((p) => (
         <div key={p.name} style={{ color: p.fill }}>
           {p.name}: <strong>{p.value}</strong>
         </div>
       ))}
     </div>
+  );
+}
+
+/* ── Custom X-axis tick — angled label for long suite names ── */
+function BarXAxisTick({ x, y, payload }) {
+  const name = payload.value || '';
+  // Show up to 18 chars then ellipsis
+  const display = name.length > 18 ? name.slice(0, 17) + '…' : name;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={8}
+        textAnchor="end"
+        fill="var(--text-secondary)"
+        fontSize={10}
+        transform="rotate(-40)"
+      >
+        {display}
+      </text>
+    </g>
   );
 }
 
@@ -187,11 +210,18 @@ export default function ExecutionDashboard({ onSelectRun, refreshTrigger }) {
 
   // Build bar data from recent runs (chronological)
   const barData = stats
-    ? [...(stats.recentRuns || [])].reverse().map((r) => ({
-        name: (r.suite_path || '').split('/').pop()?.slice(0, 12) || r.id.slice(0, 6),
-        Passed: r.passed_tests,
-        Failed: r.failed_tests,
-      }))
+    ? [...(stats.recentRuns || [])].reverse().map((r) => {
+        // Extract suite name from path, support both / and \
+        const rawName = (r.suite_name) ||
+          (r.suite_path || '').split(/[\/\\]/).pop() ||
+          r.id.slice(0, 8);
+        return {
+          name: rawName,
+          fullName: rawName, // keep full name for tooltip
+          Passed: r.passed_tests,
+          Failed: r.failed_tests,
+        };
+      })
     : [];
 
   const passRate = stats && (stats.totalPassed + stats.totalFailed) > 0
@@ -289,13 +319,15 @@ export default function ExecutionDashboard({ onSelectRun, refreshTrigger }) {
             {/* Bar chart */}
             <div className="dash-chart-card dash-chart-wide">
               <div className="dash-chart-title">Recent Pass / Fail (last 10 runs)</div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={barData} barSize={14} barGap={2}>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={barData} barSize={14} barGap={2} margin={{ bottom: 30 }}>
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+                    tick={<BarXAxisTick />}
                     axisLine={false}
                     tickLine={false}
+                    interval={0}
+                    height={50}
                   />
                   <YAxis
                     allowDecimals={false}
@@ -304,7 +336,10 @@ export default function ExecutionDashboard({ onSelectRun, refreshTrigger }) {
                     tickLine={false}
                     width={28}
                   />
-                  <Tooltip content={<BarTooltip />} />
+                  <Tooltip
+                    content={<BarTooltip />}
+                    formatter={(value, name) => [value, name]}
+                  />
                   <Bar dataKey="Passed" fill={STATUS_COLOR.passed} radius={[3, 3, 0, 0]} />
                   <Bar dataKey="Failed" fill={STATUS_COLOR.failed} radius={[3, 3, 0, 0]} />
                 </BarChart>
@@ -314,7 +349,7 @@ export default function ExecutionDashboard({ onSelectRun, refreshTrigger }) {
         )}
 
         {/* ── Table ── */}
-        <div className="dash-table-section">
+        <div className="dash-table-section" style={{ minHeight: 0 }}>
           <div className="dash-table-header">
             <div className="dash-table-title">
               Execution History
@@ -395,9 +430,9 @@ export default function ExecutionDashboard({ onSelectRun, refreshTrigger }) {
                         <button
                           className="dash-report-btn"
                           onClick={(e) => { e.stopPropagation(); onSelectRun(run); }}
-                          title="Xem report đầy đủ"
+                          title="Xem report đầy đủ trong Run Engine"
                         >
-                          View
+                          View Report
                         </button>
                       </td>
                     </tr>,

@@ -7,6 +7,17 @@ export async function listProjectSuites(projectId) {
   return response.data;
 }
 
+/**
+ * Recursively scans the Katalon project's "Test Suites" directory on disk.
+ * Returns a typed tree of all .ts suite files + folder structure.
+ * Also returns testSuitesPath (absolute path to the Test Suites folder)
+ * so the UI can open the folder picker at that exact location.
+ */
+export async function scanProjectSuites(projectId) {
+  const response = await axios.get(`${BACKEND_URL}/api/projects/${projectId}/scan-suites`);
+  return response.data;
+}
+
 export async function createProjectSuite(projectId, payload) {
   const response = await axios.post(`${BACKEND_URL}/api/projects/${projectId}/suites`, payload);
   return response.data;

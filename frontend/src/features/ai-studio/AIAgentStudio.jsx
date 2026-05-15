@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle, Bot, Check, CheckSquare, ChevronDown, ChevronRight,
-  ClipboardList, Code2, Database, FileCheck, Globe, Loader2,
-  RefreshCw, Save, ScanLine, Sparkles, Square, X,
+  ClipboardList, Code2, Database, FileCheck, FileText, Globe, Loader2,
+  Plus, RefreshCw, Save, ScanLine, Sparkles, Square, X,
 } from 'lucide-react';
 
-import { listProjects } from '../projects/projects.api';
-import { scanUrl, generateFromDom, saveTestCases } from './aiAgent.api';
+import { listProjects, generateProject } from '../projects/projects.api';
+import { scanUrl, generateFromDom, saveTestCases, generateTestCases } from './aiAgent.api';
+import { listProjectSuites } from '../suites/suites.api';
+import PathPickerInput from '../../components/PathPickerInput';
+import { readSession, writeSession, clearSession } from './useAiStudioSession';
 
-// ─── Element tag colours (shared with old Scanner) ──────────────────────────
+// ─── Element tag colours ─────────────────────────────────────────────────────
 const TAG_META = {
   input:    { bg: '#dbeafe', color: '#1d4ed8', label: 'INPUT'    },
   textarea: { bg: '#ede9fe', color: '#7c3aed', label: 'TEXTAREA' },
@@ -328,22 +331,32 @@ function TestCaseCard({ tc, index, isSelected, onToggleSelect, onChange }) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function AIAgentStudio({ onNavigateToTestCases }) {
-  // Workflow state: 'idle' | 'scanning' | 'scanned' | 'generating' | 'generated'
-  const [phase, setPhase]   = useState('idle');
+  const [phase, setPhase]             = useState(() => readSession()?.phase ?? 'idle');
+  const [inputMode, setInputMode]     = useState(() => readSession()?.inputMode ?? 'url');
+  const [url, setUrl]                 = useState(() => readSession()?.url ?? '');
+  const [scanResult, setScanResult]   = useState(() => readSession()?.scanResult ?? null);
+  const [textRequirement, setTextRequirement] = useState(() => readSession()?.textRequirement ?? '');
+  const [testCases, setTestCases]     = useState(() => readSession()?.testCases ?? []);
+  const [selected, setSelected]       = useState(() => readSession()?.selected ?? new Set());
 
-  const [url, setUrl]                   = useState('');
-  const [scanResult, setScanResult]     = useState(null);  // { url, title, elements }
-  const [testCases, setTestCases]       = useState([]);
-  const [selected, setSelected]         = useState(new Set());
-  const [projects, setProjects]         = useState([]);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [error, setError]               = useState('');
-  const [saving, setSaving]             = useState(false);
-  const [saveResult, setSaveResult]     = useState(null);
-  const [domTabOpen, setDomTabOpen]     = useState(true);
+  const [projects, setProjects]       = useState([]);
+  const [projectMode, setProjectMode] = useState(() => readSession()?.projectMode ?? 'existing');
+  const [selectedProjectId, setSelectedProjectId] = useState(() => readSession()?.selectedProjectId ?? '');
+  const [newProjectName, setNewProjectName] = useState(() => readSession()?.newProjectName ?? '');
+  const [newProjectDesc, setNewProjectDesc] = useState(() => readSession()?.newProjectDesc ?? '');
+  const [newProjectDir, setNewProjectDir]   = useState(() => readSession()?.newProjectDir ?? '');
+
+  const [suites, setSuites]           = useState([]);
+  const [selectedSuiteId, setSelectedSuiteId] = useState(() => readSession()?.selectedSuiteId ?? '');
+
+  const [error, setError]             = useState('');
+  const [saving, setSaving]           = useState(false);
+  const [saveResult, setSaveResult]   = useState(null);
+  const [domTabOpen, setDomTabOpen]   = useState(true);
 
   const urlInputRef = useRef(null);
 
+  // ── Data fetching ──────────────────────────────────────────────────────────
   const fetchProjects = useCallback(async () => {
     try {
       const data = await listProjects();
@@ -353,9 +366,52 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
     } catch { /* silently fail */ }
   }, [selectedProjectId]);
 
+  const fetchSuites = useCallback(async (projectId) => {
+    if (!projectId) { setSuites([]); setSelectedSuiteId(''); return; }
+    try {
+      const data = await listProjectSuites(projectId);
+      setSuites(data.suites || []);
+    } catch {
+      setSuites([]);
+    }
+  }, []);
+
   useEffect(() => { fetchProjects(); }, []);
 
-  // ── Step 1: Scan URL ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (projectMode === 'existing') {
+      fetchSuites(selectedProjectId);
+    } else {
+      setSuites([]);
+      setSelectedSuiteId('');
+    }
+  }, [selectedProjectId, projectMode, fetchSuites]);
+
+  useEffect(() => {
+    writeSession({
+      phase, inputMode, url, scanResult, textRequirement,
+      testCases, selected, selectedProjectId, selectedSuiteId,
+      projectMode, newProjectName, newProjectDesc, newProjectDir,
+    });
+  }, [
+    phase, inputMode, url, scanResult, textRequirement,
+    testCases, selected, selectedProjectId, selectedSuiteId,
+    projectMode, newProjectName, newProjectDesc, newProjectDir,
+  ]);
+
+  // ── Input mode switch ──────────────────────────────────────────────────────
+  function switchInputMode(mode) {
+    if (mode === inputMode) return;
+    setInputMode(mode);
+    setPhase('idle');
+    setScanResult(null);
+    setTestCases([]);
+    setSelected(new Set());
+    setSaveResult(null);
+    setError('');
+  }
+
+  // ── Step 1a: Scan URL ──────────────────────────────────────────────────────
   async function handleScan() {
     const trimmed = url.trim();
     if (!trimmed) return;
@@ -388,7 +444,30 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
     setTimeout(() => urlInputRef.current?.focus(), 50);
   }
 
-  // ── Step 2: Generate from DOM ───────────────────────────────────────────
+  // ── Step 1b: Generate from text description ────────────────────────────────
+  async function handleGenerateFromText() {
+    const trimmed = textRequirement.trim();
+    if (!trimmed) return;
+
+    setError('');
+    setTestCases([]);
+    setSelected(new Set());
+    setSaveResult(null);
+    setPhase('generating');
+
+    try {
+      const data = await generateTestCases(trimmed);
+      const tcs = data.testCases || [];
+      setTestCases(tcs);
+      setSelected(new Set(tcs.map((_, i) => i)));
+      setPhase('generated');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Lỗi khi gọi AI. Vui lòng thử lại.');
+      setPhase('idle');
+    }
+  }
+
+  // ── Step 2: Generate from DOM ──────────────────────────────────────────────
   async function handleGenerate() {
     if (!scanResult) return;
     setError('');
@@ -409,22 +488,55 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
     }
   }
 
-  // ── Step 3: Save ────────────────────────────────────────────────────────
+  // ── Step 3: Save ───────────────────────────────────────────────────────────
   async function handleSave() {
-    if (!selectedProjectId) { setError('Vui lòng chọn project trước khi lưu.'); return; }
     const toSave = testCases.filter((_, i) => selected.has(i));
     if (toSave.length === 0) { setError('Chưa có test case nào được chọn để lưu.'); return; }
 
+    // Validate project selection
+    if (projectMode === 'new') {
+      if (!newProjectName.trim()) { setError('Tên project mới là bắt buộc.'); return; }
+      if (!newProjectDir.trim()) { setError('Thư mục lưu project là bắt buộc.'); return; }
+    } else if (!selectedProjectId) {
+      setError('Vui lòng chọn project trước khi lưu.');
+      return;
+    }
+
     setSaving(true);
     setError('');
+
+    let projectId = selectedProjectId;
+
     try {
+      // Create the new project first if needed
+      if (projectMode === 'new') {
+        const projData = await generateProject({
+          name: newProjectName.trim(),
+          description: newProjectDesc.trim(),
+          save_directory: newProjectDir.trim(),
+        });
+        projectId = projData.project.id;
+        setProjects((prev) => [projData.project, ...prev]);
+        setSelectedProjectId(projectId);
+        setProjectMode('existing');
+      }
+
       const result = await saveTestCases(
-        selectedProjectId,
+        projectId,
         toSave,
-        scanResult?.url || null,
-        scanResult ? { url: scanResult.url, title: scanResult.title, elements: scanResult.elements } : null,
+        inputMode === 'url' ? (scanResult?.url || null) : null,
+        inputMode === 'url' && scanResult
+          ? { url: scanResult.url, title: scanResult.title, elements: scanResult.elements }
+          : null,
+        selectedSuiteId || null,
       );
-      setSaveResult(result);
+
+      const suiteName = selectedSuiteId
+        ? suites.find((s) => s.id === selectedSuiteId)?.name
+        : null;
+      setSaveResult({ ...result, suiteName });
+      clearSession();
+
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Lỗi khi lưu test cases.');
     } finally {
@@ -438,7 +550,6 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
   function toggleSelectAll() {
     setSelected(selected.size === testCases.length ? new Set() : new Set(testCases.map((_, i) => i)));
   }
-
   function updateTestCase(index, updated) {
     setTestCases((prev) => prev.map((tc, i) => (i === index ? updated : tc)));
   }
@@ -447,6 +558,9 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
   const isGenerating = phase === 'generating';
   const hasScanned   = ['scanned', 'generating', 'generated'].includes(phase);
   const hasResults   = phase === 'generated' && testCases.length > 0;
+  const canSave      = projectMode === 'new'
+    ? newProjectName.trim().length > 0 && newProjectDir.trim().length > 0
+    : !!selectedProjectId;
 
   return (
     <div className="studio-layout">
@@ -456,84 +570,209 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
           <div className="studio-header-icon"><Bot size={20} /></div>
           <div>
             <div className="studio-header-title">AI QA Studio</div>
-            <div className="studio-header-sub">Quét URL → AI tạo test cases → Lưu vào project</div>
+            <div className="studio-header-sub">Quét URL hoặc mô tả tính năng → AI tạo test cases → Lưu vào project</div>
           </div>
         </div>
 
-        {/* Project selector */}
+        {/* ── Project section ── */}
         <div className="studio-field">
-          <label className="studio-label">Lưu vào Project <span style={{ color: 'var(--error-color)' }}>*</span></label>
-          <select
-            className="input-field"
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-          >
-            {projects.length === 0 && <option value="">— Chưa có project —</option>}
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-
-        {/* URL input */}
-        <div className="studio-field">
-          <label className="studio-label">URL trang web cần kiểm thử <span style={{ color: 'var(--error-color)' }}>*</span></label>
-          <div className="studio-url-row">
-            <Globe size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-            <input
-              ref={urlInputRef}
-              className="input-field studio-url-input"
-              type="url"
-              placeholder="https://example.com/login"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !isScanning && handleScan()}
-              disabled={isScanning || isGenerating}
-            />
+          <label className="studio-label">
+            Project <span style={{ color: 'var(--error-color)' }}>*</span>
+          </label>
+          <div className="studio-mode-tabs">
+            <button
+              type="button"
+              className={`studio-mode-tab ${projectMode === 'existing' ? 'active' : ''}`}
+              onClick={() => setProjectMode('existing')}
+            >
+              <Database size={11} /> Existing
+            </button>
+            <button
+              type="button"
+              className={`studio-mode-tab ${projectMode === 'new' ? 'active' : ''}`}
+              onClick={() => setProjectMode('new')}
+            >
+              <Plus size={11} /> New Project
+            </button>
           </div>
-          <button
-            className="studio-scan-btn"
-            onClick={handleScan}
-            disabled={!url.trim() || isScanning || isGenerating}
-          >
-            {isScanning
-              ? <><Loader2 size={14} className="studio-spin" /> Đang quét trang…</>
-              : <><ScanLine size={14} /> Quét URL</>}
-          </button>
+
+          {projectMode === 'existing' ? (
+            <select
+              className="input-field"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+            >
+              {projects.length === 0 && <option value="">— Chưa có project —</option>}
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          ) : (
+            <div className="studio-new-project-form">
+              <input
+                className="input-field"
+                placeholder="Tên project *"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+              />
+              <input
+                className="input-field"
+                placeholder="Mô tả (tùy chọn)"
+                value={newProjectDesc}
+                onChange={(e) => setNewProjectDesc(e.target.value)}
+              />
+              <PathPickerInput
+                value={newProjectDir}
+                onChange={setNewProjectDir}
+                label=""
+                placeholder="Thư mục lưu project *"
+                type="directory"
+                required
+              />
+            </div>
+          )}
         </div>
 
-        {/* DOM summary — shown after successful scan */}
-        {hasScanned && scanResult && (
+        {/* ── Suite selector (existing projects only) ── */}
+        {projectMode === 'existing' && selectedProjectId && suites.length > 0 && (
           <div className="studio-field">
-            <label className="studio-label">Kết quả quét DOM</label>
-            <DomSummary scanResult={scanResult} onRescan={handleRescan} />
+            <label className="studio-label">
+              Liên kết vào Test Suite{' '}
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(tùy chọn)</span>
+            </label>
+            <select
+              className="input-field"
+              value={selectedSuiteId}
+              onChange={(e) => setSelectedSuiteId(e.target.value)}
+            >
+              <option value="">— Không liên kết —</option>
+              {suites.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
         )}
 
-        {/* Generate button — shown after scan */}
-        {hasScanned && scanResult && (
-          <button
-            className="studio-generate-btn"
-            onClick={handleGenerate}
-            disabled={isGenerating || isScanning}
-          >
-            {isGenerating
-              ? <><Loader2 size={16} className="studio-spin" /> AI đang tạo test cases…</>
-              : <><Sparkles size={16} /> Tạo Test Cases với AI</>}
-          </button>
-        )}
-
-        {/* Scanning state hint */}
-        {isScanning && (
-          <div className="studio-info-box">
-            <Loader2 size={13} className="studio-spin" />
-            <span>Đang khởi động Chrome headless và crawl trang. Có thể mất 15–30 giây.</span>
+        {/* ── Input mode tabs ── */}
+        <div className="studio-field">
+          <label className="studio-label">Nguồn tạo test cases</label>
+          <div className="studio-input-mode-tabs">
+            <button
+              type="button"
+              className={`studio-input-tab ${inputMode === 'url' ? 'active' : ''}`}
+              onClick={() => switchInputMode('url')}
+            >
+              <ScanLine size={12} /> URL Scan
+            </button>
+            <button
+              type="button"
+              className={`studio-input-tab ${inputMode === 'text' ? 'active' : ''}`}
+              onClick={() => switchInputMode('text')}
+            >
+              <FileText size={12} /> Text Describe
+            </button>
           </div>
+        </div>
+
+        {/* ── URL mode ── */}
+        {inputMode === 'url' && (
+          <>
+            <div className="studio-field">
+              <label className="studio-label">
+                URL trang web cần kiểm thử <span style={{ color: 'var(--error-color)' }}>*</span>
+              </label>
+              <div className="studio-url-row">
+                <Globe size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                <input
+                  ref={urlInputRef}
+                  className="input-field studio-url-input"
+                  type="url"
+                  placeholder="https://example.com/login"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !isScanning && handleScan()}
+                  disabled={isScanning || isGenerating}
+                />
+              </div>
+              <button
+                className="studio-scan-btn"
+                onClick={handleScan}
+                disabled={!url.trim() || isScanning || isGenerating}
+              >
+                {isScanning
+                  ? <><Loader2 size={14} className="studio-spin" /> Đang quét trang…</>
+                  : <><ScanLine size={14} /> Quét URL</>}
+              </button>
+            </div>
+
+            {hasScanned && scanResult && (
+              <div className="studio-field">
+                <label className="studio-label">Kết quả quét DOM</label>
+                <DomSummary scanResult={scanResult} onRescan={handleRescan} />
+              </div>
+            )}
+
+            {hasScanned && scanResult && (
+              <button
+                className="studio-generate-btn"
+                onClick={handleGenerate}
+                disabled={isGenerating || isScanning}
+              >
+                {isGenerating
+                  ? <><Loader2 size={16} className="studio-spin" /> AI đang tạo test cases…</>
+                  : <><Sparkles size={16} /> Tạo Test Cases với AI</>}
+              </button>
+            )}
+
+            {isScanning && (
+              <div className="studio-info-box">
+                <Loader2 size={13} className="studio-spin" />
+                <span>Đang khởi động Chrome headless và crawl trang. Có thể mất 15–30 giây.</span>
+              </div>
+            )}
+
+            {isGenerating && (
+              <div className="studio-info-box">
+                <Sparkles size={13} />
+                <span>AI đang phân tích cấu trúc DOM và sinh test cases. Có thể mất 15–30 giây.</span>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Generating hint */}
-        {isGenerating && (
-          <div className="studio-info-box">
-            <Sparkles size={13} />
-            <span>AI đang phân tích cấu trúc DOM và sinh test cases. Có thể mất 15–30 giây.</span>
+        {/* ── Text describe mode ── */}
+        {inputMode === 'text' && (
+          <div className="studio-field">
+            <label className="studio-label">
+              Mô tả tính năng / yêu cầu kiểm thử <span style={{ color: 'var(--error-color)' }}>*</span>
+            </label>
+            <textarea
+              className="input-field"
+              rows={6}
+              placeholder={
+                'VD: Chức năng đăng nhập bằng email và mật khẩu.\n' +
+                'Kiểm tra các trường hợp: đăng nhập thành công, sai mật khẩu,\n' +
+                'email không tồn tại, để trống form...'
+              }
+              value={textRequirement}
+              onChange={(e) => setTextRequirement(e.target.value)}
+              disabled={isGenerating}
+              style={{ resize: 'vertical', minHeight: 100 }}
+            />
+            <button
+              className="studio-generate-btn"
+              onClick={handleGenerateFromText}
+              disabled={!textRequirement.trim() || isGenerating}
+              style={{ marginTop: 8 }}
+            >
+              {isGenerating
+                ? <><Loader2 size={16} className="studio-spin" /> AI đang tạo test cases…</>
+                : <><Sparkles size={16} /> Tạo Test Cases với AI</>}
+            </button>
+            {isGenerating && (
+              <div className="studio-info-box" style={{ marginTop: 8 }}>
+                <Sparkles size={13} />
+                <span>AI đang phân tích yêu cầu và sinh test cases. Có thể mất 15–30 giây.</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -555,7 +794,9 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
             <Check size={14} />
             <span>
               Đã lưu <strong>{saveResult.saved}</strong> test case
-              {saveResult.errors > 0 && `, ${saveResult.errors} lỗi`} vào project.
+              {saveResult.errors > 0 && `, ${saveResult.errors} lỗi`}
+              {saveResult.suiteName && <> → suite <strong>"{saveResult.suiteName}"</strong></>}
+              .
             </span>
             {onNavigateToTestCases && (
               <button className="studio-nav-btn" onClick={onNavigateToTestCases}>Xem Test Cases →</button>
@@ -569,13 +810,14 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
           <div className="studio-empty-state">
             <div className="studio-empty-icon"><Bot size={52} /></div>
             <h3>AI QA Studio</h3>
-            <p>Nhập URL trang web bên trái và nhấn <strong>"Quét URL"</strong> để bắt đầu.</p>
+            <p>Chọn project, sau đó quét URL hoặc mô tả tính năng để AI tạo test cases tự động.</p>
             <div className="studio-feature-chips">
-              <span className="studio-chip"><ScanLine size={12} /> Scan DOM</span>
+              <span className="studio-chip"><ScanLine size={12} /> URL Scan</span>
+              <span className="studio-chip"><FileText size={12} /> Text Describe</span>
               <span className="studio-chip"><ClipboardList size={12} /> Test Steps</span>
               <span className="studio-chip"><FileCheck size={12} /> Expected Results</span>
               <span className="studio-chip"><Database size={12} /> Test Data</span>
-              <span className="studio-chip"><Code2 size={12} /> Katalon Script</span>
+              <span className="studio-chip"><Code2 size={12} /> Playwright Script</span>
               <span className="studio-chip"><Globe size={12} /> Object Locators</span>
             </div>
           </div>
@@ -618,7 +860,7 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
           <div className="studio-loading-overlay" style={{ position: 'relative', height: 220, background: 'transparent' }}>
             <div className="studio-loading-card">
               <Loader2 size={32} className="studio-spin" style={{ color: 'var(--accent-color)' }} />
-              <div className="studio-loading-title">AI đang phân tích DOM và tạo test cases…</div>
+              <div className="studio-loading-title">AI đang phân tích và tạo test cases…</div>
               <div className="studio-loading-sub">Quá trình này có thể mất 15–30 giây</div>
             </div>
           </div>
@@ -630,8 +872,13 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
             <div className="studio-results-bar">
               <div className="studio-results-info">
                 <Sparkles size={14} style={{ color: 'var(--accent-color)' }} />
-                <strong>{testCases.length} test cases</strong> được tạo từ{' '}
-                <code style={{ fontSize: '0.75rem' }}>{scanResult?.url}</code>
+                <strong>{testCases.length} test cases</strong>
+                {inputMode === 'url' && scanResult && (
+                  <> được tạo từ <code style={{ fontSize: '0.75rem' }}>{scanResult.url}</code></>
+                )}
+                {inputMode === 'text' && (
+                  <> được tạo từ mô tả văn bản</>
+                )}
                 {selected.size > 0 && (
                   <span className="studio-selected-badge">{selected.size} đã chọn</span>
                 )}
@@ -645,8 +892,8 @@ export default function AIAgentStudio({ onNavigateToTestCases }) {
                 <button
                   className="studio-save-btn"
                   onClick={handleSave}
-                  disabled={saving || selected.size === 0 || !selectedProjectId}
-                  title={!selectedProjectId ? 'Chọn project trước' : ''}
+                  disabled={saving || selected.size === 0 || !canSave}
+                  title={!canSave ? 'Điền thông tin project trước' : ''}
                 >
                   {saving
                     ? <><Loader2 size={13} className="studio-spin" /> Đang lưu…</>

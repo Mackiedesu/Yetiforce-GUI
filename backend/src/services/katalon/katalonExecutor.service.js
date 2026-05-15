@@ -4,19 +4,8 @@
  * katalonExecutor.service.js
  *
  * Runs Katalon Runtime Engine (katalonc.exe) via child_process.spawn.
- *
- * Key design decisions
- * ────────────────────
- * • KATALON_EXECUTABLE_PATH is read from process.env at call-time so dotenv
- *   changes are always reflected without restarting the module.
- * • All user-supplied paths are sanitized via pathSanitizer before being
- *   embedded into args[].  Users no longer need to manually wrap paths in
- *   quotes — the sanitizer strips any quotes they may have typed.
- * • spawn() receives args as a string[] (never a single shell string), so
- *   spaces inside values (e.g. "Test Suites/Login Suite") are handled
- *   natively by Node/the OS without any shell quoting tricks.
- * • shell: false on Windows avoids cmd.exe quoting pitfalls for the
- *   executable itself.
+ * After the process exits, parses the JUnit XML report from the project's
+ * Reports/ directory for per-test-case results.
  */
 
 const { spawn }               = require('child_process');
@@ -24,35 +13,23 @@ const path                    = require('path');
 const { validateKatalonEnv }  = require('../../utils/validateEnv');
 const { sanitizePath, sanitizeProfile } = require('../../utils/pathSanitizer');
 const { KATALON_API_KEY }     = require('../../config/env');
+const { parseKatalonReport }  = require('./reportParser.service');
 
 const SUPPORTED_BROWSERS = ['Chrome', 'Firefox', 'Edge', 'Chrome (headless)', 'Firefox (headless)'];
 const SUPPORTED_PROFILES = ['default', 'dev', 'staging', 'production'];
 
 // ── Argument builder ──────────────────────────────────────────────────────────
 
-/**
- * Builds the args[] array for spawn().
- *
- * WHY sanitize here and not only at the controller layer?
- * This function is the last point before values touch the OS, so it acts as a
- * defence-in-depth safety net even if the caller forgot to sanitize.
- *
- * Each element becomes one token passed to the Katalon JVM.  Because we use
- * shell: false, Node does NOT invoke cmd.exe and does NOT interpret quotes —
- * `"Test Suites/Login"` as a raw string would literally pass the quote chars
- * to Katalon.  The sanitizer removes them so the value is clean.
- */
 function buildArgs(config) {
-  // Sanitize every path/profile value unconditionally
   const projectPath = sanitizePath(config.project_path,  'project_path');
   const suitePath   = sanitizePath(config.suite_path,    'suite_path');
   const profile     = sanitizeProfile(config.profile || 'default');
 
   console.log('[KatalonExecutor] Sanitized args:');
-  console.log(`  project_path  : "${projectPath}"`);
-  console.log(`  suite_path    : "${suitePath}"`);
-  console.log(`  profile       : "${profile}"`);
-  console.log(`  browser       : "${config.browser}"`);
+  console.log(`  project_path : "${projectPath}"`);
+  console.log(`  suite_path   : "${suitePath}"`);
+  console.log(`  profile      : "${profile}"`);
+  console.log(`  browser      : "${config.browser}"`);
 
   const args = [
     `-projectPath=${projectPath}`,
@@ -63,16 +40,13 @@ function buildArgs(config) {
     '-consoleLog',
   ];
 
-  // Prefer per-request api_key, then env fallback
   const apiKey = (config.api_key && config.api_key.trim()) || KATALON_API_KEY;
-  if (apiKey) {
-    args.push(`-apiKey=${apiKey}`);
-  }
+  if (apiKey) args.push(`-apiKey=${apiKey}`);
 
   return args;
 }
 
-// ── Output parser ─────────────────────────────────────────────────────────────
+// ── Output parser (summary stats fallback) ────────────────────────────────────
 
 function parseStats(lines) {
   let passed = 0;
@@ -93,87 +67,88 @@ function parseStats(lines) {
   return { passed, failed, total };
 }
 
+// ── Watchdog timeouts ─────────────────────────────────────────────────────────
+
+// Kill KRE if it produces no output for this long (catches license-check hangs).
+const SILENCE_TIMEOUT_MS = 60_000;        // 60 s
+
+// Hard cap: kill regardless of output (runaway or infinite loop).
+const MAX_DURATION_MS = 30 * 60_000;     // 30 min
+
 // ── Main executor ─────────────────────────────────────────────────────────────
 
 /**
  * @param {object} config
- *   config.katalon_executable_path  – optional per-request override
- *   config.project_path             – required; may contain spaces
- *   config.suite_path               – required; may contain spaces / quotes
- *   config.browser                  – e.g. 'Chrome'
- *   config.profile                  – e.g. 'default'
- *   config.api_key                  – optional per-request override
  * @param {{ broadcast: Function, runId: string }} ctx
- * @returns {Promise<{ exitCode: number, duration: number, lines: string[],
- *                     error: string|null, passed: number, failed: number,
- *                     total: number }>}
+ * @returns {Promise<{
+ *   exitCode, duration, lines, error,
+ *   passed, failed, total,
+ *   skipped, errors,
+ *   testCaseDetails, reportPath, parseError
+ * }>}
  */
 async function executeKatalon(config, { broadcast, runId }) {
   return new Promise((resolve) => {
 
-    // ── 1. Validate suite_path before going any further ───────────────────
+    // ── 1. Validate suite_path ────────────────────────────────────────────
     if (!config.suite_path || !String(config.suite_path).trim()) {
       const msg = 'suite_path không được để trống. Vui lòng nhập đường dẫn Test Suite.';
       console.error(`[KatalonExecutor] Validation error: ${msg}`);
       broadcast({ type: 'katalon_log', runId, level: 'error', message: msg });
-      return resolve({ exitCode: -1, duration: 0, lines: [], error: msg, passed: 0, failed: 0, total: 0 });
+      return resolve({
+        exitCode: -1, duration: 0, lines: [], error: msg,
+        passed: 0, failed: 0, total: 0, skipped: 0, errors: 0,
+        testCaseDetails: [], reportPath: null, parseError: null,
+      });
     }
 
-    // ── 2. Determine the executable path ──────────────────────────────────
+    // ── 2. Determine executable path ──────────────────────────────────────
     const overridePath = config.katalon_executable_path &&
       String(config.katalon_executable_path).trim();
-
     let execPath;
 
     if (overridePath) {
-      // Caller supplied an explicit path — sanitize & resolve it
       execPath = path.resolve(sanitizePath(overridePath, 'katalon_executable_path'));
-      console.log(`[KatalonExecutor] Using per-request executable path: "${execPath}"`);
+      console.log(`[KatalonExecutor] Using per-request executable: "${execPath}"`);
     } else {
-      // Read from environment (dotenv-backed, lazy)
       const validation = validateKatalonEnv();
-
       if (!validation.valid) {
         const msg = `[KatalonExecutor] ${validation.error}`;
         console.error(msg);
         broadcast({ type: 'katalon_log', runId, level: 'error', message: validation.error });
         return resolve({
           exitCode: -1, duration: 0, lines: [], error: validation.error,
-          passed: 0, failed: 0, total: 0,
+          passed: 0, failed: 0, total: 0, skipped: 0, errors: 0,
+          testCaseDetails: [], reportPath: null, parseError: null,
         });
       }
-
       execPath = validation.execPath;
-      console.log(`[KatalonExecutor] KATALON_EXECUTABLE_PATH resolved to: "${execPath}"`);
+      console.log(`[KatalonExecutor] KATALON_EXECUTABLE_PATH: "${execPath}"`);
     }
 
-    // ── 3. Build sanitized argument list ──────────────────────────────────
+    // ── 3. Build args ─────────────────────────────────────────────────────
     let args;
     try {
       args = buildArgs(config);
     } catch (validationErr) {
       const msg = validationErr.message;
-      console.error(`[KatalonExecutor] Argument validation failed: ${msg}`);
+      console.error(`[KatalonExecutor] Arg validation failed: ${msg}`);
       broadcast({ type: 'katalon_log', runId, level: 'error', message: msg });
-      return resolve({ exitCode: -1, duration: 0, lines: [], error: msg, passed: 0, failed: 0, total: 0 });
+      return resolve({
+        exitCode: -1, duration: 0, lines: [], error: msg,
+        passed: 0, failed: 0, total: 0, skipped: 0, errors: 0,
+        testCaseDetails: [], reportPath: null, parseError: null,
+      });
     }
 
-    // Log the exact command that will be spawned (sanitized, no literal quotes)
     const displayCmd = `"${execPath}" ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`;
     console.log(`[KatalonExecutor] Spawning: ${displayCmd}`);
     broadcast({
-      type: 'katalon_log',
-      runId,
-      level: 'info',
+      type: 'katalon_log', runId, level: 'info',
       message: `▶ Khởi chạy Katalon: ${path.basename(execPath)} ${args.join(' ')}`,
     });
 
-    // ── 4. Spawn the process ──────────────────────────────────────────────
-    //
-    // IMPORTANT: shell: false means Node passes the args[] directly to the OS
-    // without invoking cmd.exe.  Spaces inside individual args[] elements are
-    // handled natively — no extra shell quoting is needed or wanted.
-    //
+    // ── 4. Spawn ──────────────────────────────────────────────────────────
     const proc = spawn(execPath, args, {
       shell: false,
       windowsHide: true,
@@ -182,12 +157,43 @@ async function executeKatalon(config, { broadcast, runId }) {
 
     const outputLines = [];
     const startTime   = Date.now();
+    let   resolved    = false;
+
+    // ── Watchdog: silence timer ───────────────────────────────────────────
+    // Resets on every stdout/stderr line; fires if KRE goes silent.
+    let silenceTimer = null;
+
+    function resetSilenceTimer() {
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        const msg = `Katalon không phản hồi trong ${SILENCE_TIMEOUT_MS / 1000}s (có thể bị treo khi xác thực license). Đang dừng tiến trình.`;
+        console.error(`[KatalonExecutor] Silence timeout: ${msg}`);
+        broadcast({ type: 'katalon_log', runId, level: 'error', message: msg });
+        proc.kill('SIGKILL');
+      }, SILENCE_TIMEOUT_MS);
+    }
+
+    // ── Watchdog: absolute duration cap ──────────────────────────────────
+    const maxTimer = setTimeout(() => {
+      const msg = `Katalon đã chạy quá ${MAX_DURATION_MS / 60_000} phút. Đang dừng tiến trình.`;
+      console.error(`[KatalonExecutor] Max-duration timeout: ${msg}`);
+      broadcast({ type: 'katalon_log', runId, level: 'error', message: msg });
+      proc.kill('SIGKILL');
+    }, MAX_DURATION_MS);
+
+    function cleanup() {
+      clearTimeout(silenceTimer);
+      clearTimeout(maxTimer);
+    }
+
+    resetSilenceTimer();
 
     function handleLine(level, raw) {
       const line = raw.trimEnd();
       if (!line) return;
       outputLines.push(line);
       broadcast({ type: 'katalon_log', runId, level, message: line });
+      resetSilenceTimer();
     }
 
     function splitLines(data, level) {
@@ -197,28 +203,68 @@ async function executeKatalon(config, { broadcast, runId }) {
     proc.stdout.on('data', (d) => splitLines(d, 'info'));
     proc.stderr.on('data', (d) => splitLines(d, 'warn'));
 
-    // ── 5. Handle spawn errors ────────────────────────────────────────────
+    // ── 5. Spawn error ────────────────────────────────────────────────────
     proc.on('error', (err) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+
       let msg;
       if (err.code === 'ENOENT') {
-        msg = `Không tìm thấy Katalon CLI tại: "${execPath}". Kiểm tra lại KATALON_EXECUTABLE_PATH trong .env hoặc tham số katalon_executable_path.`;
+        msg = `Không tìm thấy Katalon CLI tại: "${execPath}". Kiểm tra lại KATALON_EXECUTABLE_PATH.`;
       } else if (err.code === 'EACCES') {
-        msg = `Không có quyền thực thi Katalon CLI tại: "${execPath}". Vui lòng kiểm tra quyền file.`;
+        msg = `Không có quyền thực thi Katalon CLI tại: "${execPath}".`;
       } else {
-        msg = `Lỗi khởi chạy tiến trình Katalon: ${err.message} (code: ${err.code})`;
+        msg = `Lỗi khởi chạy Katalon: ${err.message} (code: ${err.code})`;
       }
-
       console.error(`[KatalonExecutor] spawn error: ${msg}`);
       broadcast({ type: 'katalon_log', runId, level: 'error', message: msg });
 
-      const duration = Date.now() - startTime;
-      resolve({ exitCode: -1, duration, lines: outputLines, error: msg, passed: 0, failed: 0, total: 0 });
+      resolve({
+        exitCode: -1, duration: Date.now() - startTime,
+        lines: outputLines, error: msg,
+        passed: 0, failed: 0, total: 0, skipped: 0, errors: 0,
+        testCaseDetails: [], reportPath: null, parseError: null,
+      });
     });
 
-    // ── 6. Handle process exit ────────────────────────────────────────────
-    proc.on('close', (code) => {
+    // ── 6. Process exit — parse report ────────────────────────────────────
+    proc.on('close', async (code) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+
       const duration = Date.now() - startTime;
-      const { passed, failed, total } = parseStats(outputLines);
+
+      // Try parsing the JUnit report; always resolve even if parsing fails
+      let reportData = { testCases: [], summary: null, reportPath: null, parseError: null };
+      try {
+        reportData = await parseKatalonReport(config.project_path, startTime);
+        if (reportData.parseError) {
+          console.warn(`[KatalonExecutor] Report parse warning: ${reportData.parseError}`);
+        }
+      } catch (parseErr) {
+        reportData.parseError = parseErr.message;
+        console.warn(`[KatalonExecutor] Report parse exception: ${parseErr.message}`);
+      }
+
+      // Use report data for counts when available; fall back to stdout regex
+      const fromStdout = parseStats(outputLines);
+      const passed = reportData.testCases.length > 0
+        ? reportData.testCases.filter((tc) => tc.status === 'PASSED').length
+        : fromStdout.passed;
+      const failed = reportData.testCases.length > 0
+        ? reportData.testCases.filter((tc) => tc.status === 'FAILED').length
+        : fromStdout.failed;
+      const skipped = reportData.testCases.length > 0
+        ? reportData.testCases.filter((tc) => tc.status === 'SKIPPED').length
+        : 0;
+      const errors = reportData.testCases.length > 0
+        ? reportData.testCases.filter((tc) => tc.status === 'ERROR').length
+        : 0;
+      const total = reportData.testCases.length > 0
+        ? reportData.testCases.length
+        : fromStdout.total;
 
       const statusLine = code === 0
         ? `✅ Katalon kết thúc (exit 0) — ${passed}/${total} passed, thời gian ${(duration / 1000).toFixed(1)}s`
@@ -226,13 +272,25 @@ async function executeKatalon(config, { broadcast, runId }) {
 
       console.log(`[KatalonExecutor] ${statusLine}`);
       broadcast({
-        type: 'katalon_log',
-        runId,
+        type: 'katalon_log', runId,
         level: code === 0 ? 'info' : 'error',
         message: statusLine,
       });
 
-      resolve({ exitCode: code, duration, lines: outputLines, error: null, passed, failed, total });
+      resolve({
+        exitCode: code,
+        duration,
+        lines: outputLines,
+        error: null,
+        passed,
+        failed,
+        total,
+        skipped,
+        errors,
+        testCaseDetails: reportData.testCases,
+        reportPath:      reportData.reportPath,
+        parseError:      reportData.parseError,
+      });
     });
   });
 }

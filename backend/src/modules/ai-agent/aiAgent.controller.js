@@ -1,6 +1,8 @@
 const { generateTestCasesFromFeature, generateTestCasesFromDOM } = require('./aiAgent.service');
 const { crawlPageElements } = require('../scanner/scanner.service');
-const { createTestCase, projectExists } = require('../test-cases/infrastructure/testCase.repository.pg');
+const { createTestCase, projectExists, getProjectPath } = require('../test-cases/infrastructure/testCase.repository.pg');
+const { writeTestCaseFile, writeTestSuiteFile, writeObjectRepositoryFile } = require('../projects/infrastructure/mochaFileWriter.service');
+const suiteRepository = require('../test-suites/infrastructure/testSuite.repository.pg');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -105,7 +107,7 @@ async function generateFromDomHandler(req, res) {
 // ─── Save batch (shared by both text and DOM workflows) ─────────────────────
 
 async function saveBatchHandler(req, res) {
-  const { project_id, testCases, source_url, scanned_dom_json } = req.body;
+  const { project_id, suite_id, testCases, source_url, scanned_dom_json } = req.body;
 
   if (!project_id) {
     return res.status(400).json({ error: 'project_id là bắt buộc' });
@@ -117,6 +119,17 @@ async function saveBatchHandler(req, res) {
   const exists = await projectExists(project_id);
   if (!exists) {
     return res.status(404).json({ error: 'Project không tồn tại' });
+  }
+
+  // Fetch the on-disk Katalon project path so we can write .tc / .groovy files
+  const projectPath = await getProjectPath(project_id);
+
+  // Validate suite belongs to project if provided
+  if (suite_id) {
+    const suiteCheck = await suiteRepository.getSuiteById(project_id, suite_id);
+    if (!suiteCheck) {
+      return res.status(404).json({ error: 'Test suite không tồn tại trong project này' });
+    }
   }
 
   const saved = [];
@@ -144,8 +157,75 @@ async function saveBatchHandler(req, res) {
           : [],
       });
       saved.push(created);
+
+      // ── Write .tc + Script.groovy files to disk ──────────────────────────
+      if (projectPath) {
+        const { diskError } = writeTestCaseFile(projectPath, tc.name, {
+          description: tc.description || '',
+          url:         source_url   || '',
+          script:      tc.katalonScript || '',
+        });
+        if (diskError) {
+          console.warn(`[AI Studio] Disk write warning for "${tc.name}": ${diskError}`);
+        } else {
+          console.log(`[AI Studio] Wrote Katalon files for "${tc.name}" to disk`);
+        }
+
+        // ── Write Object Repository .rs files for each test object locator ──
+        if (Array.isArray(tc.objectLocators) && tc.objectLocators.length > 0) {
+          for (const locator of tc.objectLocators) {
+            if (!locator.name) continue;
+            const { rsFilePath, diskError: rsDiskError } = writeObjectRepositoryFile(
+              projectPath,
+              locator.name,
+              {
+                selectorMethod: locator.selectorMethod || 'XPATH',
+                selectorValue:  locator.selectorValue  || '',
+                description:    locator.description    || '',
+              }
+            );
+            if (rsDiskError) {
+              console.warn(`[AI Studio] Object repo write warning for "${locator.name}": ${rsDiskError}`);
+            } else {
+              console.log(`[AI Studio] Wrote object repository file: ${rsFilePath}`);
+            }
+          }
+        }
+      } else {
+        console.warn(`[AI Studio] No katalon_project_path for project ${project_id} — skipping disk write`);
+      }
+
+      // ── Link to suite if suite_id provided ───────────────────────────
+      if (suite_id) {
+        try {
+          await suiteRepository.addTestCase(project_id, suite_id, { test_case_id: created.id });
+        } catch (linkErr) {
+          console.warn(`[AI Studio] Suite link warning for "${tc.name}": ${linkErr.message}`);
+        }
+      }
     } catch (err) {
       errors.push({ name: tc.name, error: err.message });
+    }
+  }
+
+  // ── Regenerate .ts suite file on disk after all test cases linked ─────
+  if (suite_id && saved.length > 0 && projectPath) {
+    try {
+      const updatedSuite = await suiteRepository.getSuiteById(project_id, suite_id);
+      if (updatedSuite) {
+        const { diskError } = writeTestSuiteFile(projectPath, updatedSuite.name, {
+          description: updatedSuite.description,
+          suiteId:     updatedSuite.id,
+          testCases:   (updatedSuite.test_cases || []).map((tc) => ({ id: tc.id, name: tc.name })),
+        });
+        if (diskError) {
+          console.warn(`[AI Studio] Suite .ts sync warning: ${diskError}`);
+        } else {
+          console.log(`[AI Studio] Synced .ts file for suite "${updatedSuite.name}"`);
+        }
+      }
+    } catch (syncErr) {
+      console.warn(`[AI Studio] Suite .ts sync error: ${syncErr.message}`);
     }
   }
 

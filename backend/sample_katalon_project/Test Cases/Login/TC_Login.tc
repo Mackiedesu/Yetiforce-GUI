@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestCaseEntity>
+   <description>Sample login test case — verifies that the login button is present on the page</description>
+   <name>TC_Login</name>
+   <tag></tag>
+   <comment></comment>
+   <steps/>
+   <variables/>
+</TestCaseEntity>

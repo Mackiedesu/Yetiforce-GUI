@@ -1,5 +1,7 @@
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const { validateTestCasePayload: validateCanonicalTestCasePayload } = require('../../../test-cases/interface/http/testCase.validator');
+
 function validationError(message) {
   const error = new Error(message);
   error.statusCode = 400;
@@ -36,22 +38,15 @@ function validateTestCasePayload(payload) {
     throw validationError('Payload test case không hợp lệ');
   }
 
+  // Linking an existing reusable test case — validate UUID only
   if (typeof payload.test_case_id !== 'undefined') {
     ensureUuid(payload.test_case_id, 'test_case_id');
-    return {
-      test_case_id: payload.test_case_id
-    };
+    return { test_case_id: payload.test_case_id };
   }
 
-  ensureText(payload.name, 'Tên test case');
-
-  return {
-    name: payload.name.trim(),
-    description: typeof payload.description === 'string' ? payload.description.trim() : '',
-    expected_result: typeof payload.expected_result === 'string' ? payload.expected_result.trim() : '',
-    script: typeof payload.script === 'string' ? payload.script : '',
-    url: typeof payload.url === 'string' ? payload.url : ''
-  };
+  // Inline creation — delegate to the canonical test case validator so
+  // steps[], data_sets[], and all other fields are validated identically
+  return validateCanonicalTestCasePayload(payload);
 }
 
 function validateReorderPayload(payload) {

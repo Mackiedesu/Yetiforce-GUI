@@ -218,8 +218,88 @@ function readTree(dirPath, depth, maxDepth, maxNodes, nodeState = { count: 0 }) 
   return tree;
 }
 
+// ── Mocha project folders ────────────────────────────────────────────────────
+
+const MOCHA_FOLDERS_LIST = [
+  'tests/suites',
+  'tests/cases',
+  'tests/generated',
+  'tests/locators',
+  'reports',
+  'screenshots',
+];
+
+function isMochaProject(resolvedPath) {
+  return (
+    fs.existsSync(path.join(resolvedPath, 'tests')) ||
+    fs.existsSync(path.join(resolvedPath, '.mocharc.cjs')) ||
+    (fs.existsSync(path.join(resolvedPath, 'package.json')) &&
+     !fs.existsSync(path.join(resolvedPath, 'Test Cases')))
+  );
+}
+
+function parseMochaProjectStructure(resolvedPath) {
+  const folders = {};
+  for (const rel of MOCHA_FOLDERS_LIST) {
+    const parts      = rel.split('/');
+    const folderPath = path.join(resolvedPath, ...parts);
+    let exists = false;
+    try {
+      exists = fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory();
+    } catch { exists = false; }
+    folders[rel] = {
+      exists,
+      path:       folderPath,
+      file_count: exists ? countFiles(folderPath) : 0,
+      tree:       exists ? readTree(folderPath, 0, 4, 500) : [],
+    };
+  }
+  return {
+    root_path:    resolvedPath,
+    project_type: 'mocha',
+    folders,
+    summary: {
+      required_folders: MOCHA_FOLDERS_LIST,
+      minimum_required: ['tests/suites', 'tests/cases'],
+      found_count:      MOCHA_FOLDERS_LIST.filter((n) => folders[n].exists).length,
+      missing_folders:  MOCHA_FOLDERS_LIST.filter((n) => !folders[n].exists),
+    },
+  };
+}
+
+/**
+ * Auto-detect project type (Mocha or Katalon legacy) and return its structure.
+ * Use this for the "view structure" feature — it never rejects a Mocha project.
+ */
+function parseProjectStructure(projectPath) {
+  if (!isPlausibleAbsolutePath(projectPath)) {
+    throw parserError('Đường dẫn project không hợp lệ.');
+  }
+  const resolvedPath = path.resolve(projectPath.trim());
+  if (!fs.existsSync(resolvedPath)) {
+    throw parserError(`Đường dẫn không tồn tại: "${resolvedPath}".`);
+  }
+  let stats;
+  try { stats = fs.statSync(resolvedPath); } catch (e) {
+    throw parserError(`Không thể truy cập: "${resolvedPath}". ${e.message}`);
+  }
+  if (!stats.isDirectory()) {
+    throw parserError(`"${resolvedPath}" không phải thư mục.`);
+  }
+  try { fs.accessSync(resolvedPath, fs.constants.R_OK); } catch {
+    throw parserError(`Không có quyền đọc thư mục: "${resolvedPath}".`);
+  }
+
+  if (isMochaProject(resolvedPath)) {
+    return parseMochaProjectStructure(resolvedPath);
+  }
+  return parseKatalonProjectStructure(projectPath);
+}
+
 module.exports = {
   parseKatalonProjectStructure,
+  parseProjectStructure,
   REQUIRED_FOLDERS,
-  MINIMUM_KATALON_FOLDERS
+  MINIMUM_KATALON_FOLDERS,
+  MOCHA_FOLDERS_LIST,
 };

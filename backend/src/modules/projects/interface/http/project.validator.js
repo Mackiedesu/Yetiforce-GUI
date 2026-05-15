@@ -6,7 +6,8 @@
  * before we hit business logic or the database.
  *
  * Deeper validation (path existence, Katalon structure) lives in
- * katalonProjectParser.service.js so it is reusable without HTTP context.
+ * katalonProjectParser.service.js / katalonScaffold.service.js so it is
+ * reusable without HTTP context.
  */
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -88,7 +89,55 @@ function validateCreateOrUpdatePayload(payload) {
   };
 }
 
+/**
+ * Validates the payload for POST /projects/generate.
+ * Requires: name, save_directory
+ * Optional: description
+ */
+function validateGeneratePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw validationError('Payload không hợp lệ');
+  }
+
+  // ── Name ──────────────────────────────────────────────────────────────────
+  if (!ensureNonEmptyString(payload.name)) {
+    throw validationError('Tên project là bắt buộc');
+  }
+  const trimmedName = payload.name.trim();
+  if (trimmedName.length > MAX_NAME_LENGTH) {
+    throw validationError(`Tên project không được vượt quá ${MAX_NAME_LENGTH} ký tự`);
+  }
+
+  // ── Save directory ────────────────────────────────────────────────────────
+  if (!ensureNonEmptyString(payload.save_directory)) {
+    throw validationError('Thư mục lưu project là bắt buộc');
+  }
+  const trimmedDir = payload.save_directory.trim();
+
+  if (trimmedDir.includes('\0')) {
+    throw validationError('Đường dẫn chứa ký tự không hợp lệ (null byte)');
+  }
+  if (!ABSOLUTE_PATH_PATTERN.test(trimmedDir)) {
+    throw validationError(
+      'Đường dẫn thư mục lưu không hợp lệ. ' +
+      'Vui lòng nhập đường dẫn tuyệt đối, ví dụ: D:\\\\KatalonProjects'
+    );
+  }
+
+  // ── Description (optional) ────────────────────────────────────────────────
+  const description = typeof payload.description === 'string'
+    ? payload.description.trim()
+    : '';
+
+  return {
+    name: trimmedName,
+    description,
+    save_directory: trimmedDir,
+  };
+}
+
 module.exports = {
   ensureUuid,
-  validateCreateOrUpdatePayload
+  validateCreateOrUpdatePayload,
+  validateGeneratePayload,
 };

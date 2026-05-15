@@ -7,6 +7,14 @@ async function projectExists(projectId) {
   return result.rowCount > 0;
 }
 
+async function getProjectPath(projectId) {
+  const result = await query(
+    'SELECT katalon_project_path FROM projects WHERE id = $1 LIMIT 1',
+    [projectId]
+  );
+  return result.rows[0]?.katalon_project_path || null;
+}
+
 async function listTestCasesByProject(projectId) {
   const result = await query(
     `SELECT tc.id,
@@ -260,9 +268,14 @@ async function deleteTestCase(projectId, testCaseId) {
 
 module.exports = {
   projectExists,
+  getProjectPath,
   listTestCasesByProject,
   getTestCaseById,
   createTestCase,
   updateTestCase,
-  deleteTestCase
+  deleteTestCase,
+  // Shared helpers — used by testSuite.repository.pg to keep both paths in sync
+  insertStepsRecursive,
+  replaceTestCaseSteps,
+  replaceTestCaseDataSets,
 };

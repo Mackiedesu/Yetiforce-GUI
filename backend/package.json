@@ -13,12 +13,14 @@
   "description": "",
   "dependencies": {
     "@google/genai": "^1.50.1",
+    "chai": "^6.2.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mocha": "^11.7.5",
     "mochawesome": "^7.1.4",
     "pg": "^8.20.0",
+    "playwright": "^1.60.0",
     "selenium-webdriver": "^4.43.0",
     "ws": "^8.20.0"
   }

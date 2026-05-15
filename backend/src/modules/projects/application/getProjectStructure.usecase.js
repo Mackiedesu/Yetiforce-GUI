@@ -4,7 +4,7 @@ async function getProjectStructureUseCase(projectRepository, parserService, proj
     return null;
   }
 
-  const structure = parserService.parseKatalonProjectStructure(project.katalon_project_path);
+  const structure = parserService.parseProjectStructure(project.katalon_project_path);
 
   return {
     project,

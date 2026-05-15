@@ -11,6 +11,15 @@ export async function createProject(payload) {
   return response.data;
 }
 
+/**
+ * Generate a new Katalon project on disk + register in DB.
+ * payload: { name, description, save_directory }
+ */
+export async function generateProject(payload) {
+  const response = await axios.post(`${BACKEND_URL}/api/projects/generate`, payload);
+  return response.data;
+}
+
 export async function updateProject(projectId, payload) {
   const response = await axios.put(`${BACKEND_URL}/api/projects/${projectId}`, payload);
   return response.data;

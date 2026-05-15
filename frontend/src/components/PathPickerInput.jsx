@@ -45,6 +45,7 @@ export default function PathPickerInput({
   readOnly = true,
   disabled = false,
   id,
+  startPath = '',
 }) {
   const [modalOpen, setModalOpen]         = useState(false);
   const [validating, setValidating]       = useState(false);
@@ -142,6 +143,7 @@ export default function PathPickerInput({
       {modalOpen && (
         <FsBrowserModal
           initialPath={value}
+          startPath={startPath}
           pickType={type}
           fileExtension={fileExtension}
           onSelect={handleSelected}
@@ -156,7 +158,7 @@ export default function PathPickerInput({
 /* FsBrowserModal                                                               */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-function FsBrowserModal({ initialPath, pickType, fileExtension, onSelect, onClose }) {
+function FsBrowserModal({ initialPath, startPath, pickType, fileExtension, onSelect, onClose }) {
   const [currentPath, setCurrentPath]   = useState('');
   const [items, setItems]               = useState([]);
   const [breadcrumb, setBreadcrumb]     = useState([]);
@@ -174,13 +176,13 @@ function FsBrowserModal({ initialPath, pickType, fileExtension, onSelect, onClos
       .catch(() => {});
   }, []);
 
-  // Navigate to initialPath or root on mount
+  // Navigate to initialPath, startPath, or root on mount
   useEffect(() => {
     if (initialPath) {
-      // Try to navigate to the parent folder of the initial path
       browse(initialPath);
+    } else if (startPath) {
+      browse(startPath);
     } else {
-      // Start from Windows C:\  or /
       browse('C:\\');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

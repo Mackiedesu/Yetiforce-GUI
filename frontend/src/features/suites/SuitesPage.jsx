@@ -16,7 +16,7 @@ import {
   updateProjectSuite,
   updateSuiteTestCase
 } from './suites.api';
-import { listProjectTestCases } from '../test-cases/testCases.api';
+import { getProjectTestCase, listProjectTestCases } from '../test-cases/testCases.api';
 
 function SortableTestCaseItem({ testCase, onEdit, onDelete }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: testCase.id });
@@ -57,9 +57,22 @@ const EMPTY_SUITE_FORM = {
 const EMPTY_TEST_CASE_FORM = {
   name: '',
   description: '',
+  expected_result: '',
+  url: '',
   script: '',
-  url: ''
+  steps_json: '[]',
+  data_sets_json: '[]',
 };
+
+function parseJsonField(rawValue, fieldName) {
+  try {
+    const parsed = JSON.parse(rawValue || '[]');
+    if (!Array.isArray(parsed)) throw new Error(`${fieldName} phải là mảng JSON`);
+    return parsed;
+  } catch (error) {
+    throw new Error(`${fieldName} không hợp lệ: ${error.message}`);
+  }
+}
 
 const SuitesPage = ({ addLog }) => {
   const [projects, setProjects] = useState([]);
@@ -239,13 +252,33 @@ const SuitesPage = ({ addLog }) => {
       return;
     }
 
+    let steps;
+    let dataSets;
+    try {
+      steps = parseJsonField(testCaseForm.steps_json, 'steps_json');
+      dataSets = parseJsonField(testCaseForm.data_sets_json, 'data_sets_json');
+    } catch (error) {
+      addLog(error.message, 'error');
+      return;
+    }
+
+    const payload = {
+      name: testCaseForm.name,
+      description: testCaseForm.description,
+      expected_result: testCaseForm.expected_result,
+      url: testCaseForm.url,
+      script: testCaseForm.script,
+      steps,
+      data_sets: dataSets,
+    };
+
     try {
       let data;
       if (editingTestCaseId) {
-        data = await updateSuiteTestCase(selectedProjectId, selectedSuiteId, editingTestCaseId, testCaseForm);
+        data = await updateSuiteTestCase(selectedProjectId, selectedSuiteId, editingTestCaseId, payload);
         addLog('Đã cập nhật test case.', 'success');
       } else {
-        data = await addSuiteTestCase(selectedProjectId, selectedSuiteId, testCaseForm);
+        data = await addSuiteTestCase(selectedProjectId, selectedSuiteId, payload);
         addLog('Đã thêm test case vào suite.', 'success');
       }
 
@@ -280,14 +313,33 @@ const SuitesPage = ({ addLog }) => {
     }
   }
 
-  function handleEditTestCase(testCase) {
+  async function handleEditTestCase(testCase) {
     setEditingTestCaseId(testCase.id);
-    setTestCaseForm({
-      name: testCase.name || '',
-      description: testCase.description || '',
-      script: testCase.script || '',
-      url: testCase.url || ''
-    });
+    try {
+      const data = await getProjectTestCase(selectedProjectId, testCase.id);
+      const item = data.test_case;
+      setTestCaseForm({
+        name: item.name || '',
+        description: item.description || '',
+        expected_result: item.expected_result || '',
+        url: item.url || '',
+        script: item.script || '',
+        steps_json: JSON.stringify(item.steps || [], null, 2),
+        data_sets_json: JSON.stringify(item.data_sets || [], null, 2),
+      });
+    } catch (error) {
+      addLog(`Lỗi tải chi tiết test case: ${error.response?.data?.error || error.message}`, 'error');
+      // Fallback to the shallow data already in suite view
+      setTestCaseForm({
+        name: testCase.name || '',
+        description: testCase.description || '',
+        expected_result: testCase.expected_result || '',
+        url: testCase.url || '',
+        script: testCase.script || '',
+        steps_json: '[]',
+        data_sets_json: '[]',
+      });
+    }
   }
 
   async function handleDeleteTestCase(testCaseId) {
@@ -490,6 +542,15 @@ const SuitesPage = ({ addLog }) => {
                     />
                   </div>
                   <div className="input-group">
+                    <label>Expected Result</label>
+                    <textarea
+                      className="input-field"
+                      rows={2}
+                      value={testCaseForm.expected_result}
+                      onChange={(event) => setTestCaseForm((prev) => ({ ...prev, expected_result: event.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group">
                     <label>URL</label>
                     <input
                       className="input-field"
@@ -504,6 +565,26 @@ const SuitesPage = ({ addLog }) => {
                       rows={3}
                       value={testCaseForm.script}
                       onChange={(event) => setTestCaseForm((prev) => ({ ...prev, script: event.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Steps JSON (nested)</label>
+                    <textarea
+                      className="input-field"
+                      rows={6}
+                      value={testCaseForm.steps_json}
+                      onChange={(event) => setTestCaseForm((prev) => ({ ...prev, steps_json: event.target.value }))}
+                      placeholder='[{"title":"Step 1","description":"","expected_result":"","children":[]}]'
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Data Sets JSON</label>
+                    <textarea
+                      className="input-field"
+                      rows={4}
+                      value={testCaseForm.data_sets_json}
+                      onChange={(event) => setTestCaseForm((prev) => ({ ...prev, data_sets_json: event.target.value }))}
+                      placeholder='[{"name":"Dataset 1","data_json":{"key":"value"}}]'
                     />
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>

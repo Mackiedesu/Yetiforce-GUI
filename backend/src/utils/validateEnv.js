@@ -1,51 +1,49 @@
+'use strict';
+
 /**
  * validateEnv.js
- * Utility to validate Katalon-related environment variables at startup or on demand.
+ * Validates that the Mocha + Playwright execution environment is ready.
  */
 
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
 
+const BACKEND_ROOT         = path.resolve(__dirname, '../../..');
+const BACKEND_NODE_MODULES = path.join(BACKEND_ROOT, 'node_modules');
+const MOCHA_BIN            = path.join(BACKEND_NODE_MODULES, 'mocha', 'bin', 'mocha.js');
+const PLAYWRIGHT_ENTRY     = path.join(BACKEND_NODE_MODULES, 'playwright', 'index.js');
+
 /**
- * Validates KATALON_EXECUTABLE_PATH from process.env.
+ * Validates the Mocha + Playwright execution environment.
  *
- * @returns {{ valid: boolean, execPath: string|null, error: string|null }}
+ * @returns {{ valid: boolean, error: string|null, details: object }}
  */
 function validateKatalonEnv() {
-  const rawPath = process.env.KATALON_EXECUTABLE_PATH;
-
-  if (!rawPath || !rawPath.trim()) {
+  if (!fs.existsSync(MOCHA_BIN)) {
     return {
       valid: false,
       execPath: null,
       error:
-        'Biến môi trường KATALON_EXECUTABLE_PATH chưa được cấu hình trong file .env.',
+        `Không tìm thấy Mocha binary tại "${MOCHA_BIN}". ` +
+        'Chạy "npm install" trong thư mục backend.',
     };
   }
 
-  // Normalize: trim whitespace, resolve any relative path segments
-  const execPath = path.resolve(rawPath.trim());
-
-  // Check the filename ends with katalonc or katalonc.exe
-  const basename = path.basename(execPath).toLowerCase();
-  if (basename !== 'katalonc' && basename !== 'katalonc.exe') {
+  if (!fs.existsSync(PLAYWRIGHT_ENTRY)) {
     return {
       valid: false,
-      execPath,
-      error: `KATALON_EXECUTABLE_PATH phải trỏ đến "katalonc.exe", nhưng nhận được: "${basename}"`,
+      execPath: null,
+      error:
+        `Không tìm thấy Playwright tại "${PLAYWRIGHT_ENTRY}". ` +
+        'Chạy "npm install" trong thư mục backend.',
     };
   }
 
-  // Check the file actually exists on disk
-  if (!fs.existsSync(execPath)) {
-    return {
-      valid: false,
-      execPath,
-      error: `Không tìm thấy Katalon CLI tại đường dẫn: "${execPath}". Vui lòng kiểm tra lại KATALON_EXECUTABLE_PATH trong .env.`,
-    };
-  }
-
-  return { valid: true, execPath, error: null };
+  return {
+    valid:    true,
+    execPath: MOCHA_BIN,
+    error:    null,
+  };
 }
 
 module.exports = { validateKatalonEnv };

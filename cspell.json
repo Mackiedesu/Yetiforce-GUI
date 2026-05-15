@@ -1,0 +1,29 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "ignorePaths": [
+    "docs/uml/**/*.puml",
+    "node_modules/**",
+    "dist/**",
+    "build/**"
+  ],
+  "words": [
+    "Katalon",
+    "katalonc",
+    "plantuml",
+    "skinparam",
+    "startuml",
+    "enduml",
+    "roundcorner",
+    "handwritten",
+    "shadowing",
+    "usecase",
+    "groovy",
+    "WebSocket",
+    "websocket",
+    "KRE",
+    "puml",
+    "prj",
+    "glbl"
+  ]
+}

@@ -45,15 +45,18 @@ router.get('/drives', asyncHandler(async (_req, res) => {
 
   if (platform === 'win32') {
     try {
-      // wmic logicaldisk returns lines like "C:", "D:", etc.
-      const raw = execSync('wmic logicaldisk get Caption', { encoding: 'utf8', timeout: 5000 });
+      // PowerShell: works on all Windows versions including 11 (wmic was removed)
+      const raw = execSync(
+        'powershell -NoProfile -Command "Get-PSDrive -PSProvider FileSystem | ForEach-Object { $_.Root }"',
+        { encoding: 'utf8', timeout: 5000 },
+      );
       drives = raw
         .split(/\r?\n/)
         .map((l) => l.trim())
-        .filter((l) => /^[A-Z]:$/i.test(l))
-        .map((letter) => ({
-          name: letter + '\\',
-          path: letter + '\\',
+        .filter((l) => /^[A-Z]:\\$/i.test(l))
+        .map((root) => ({
+          name: root,
+          path: root,
           type: 'drive',
         }));
     } catch {

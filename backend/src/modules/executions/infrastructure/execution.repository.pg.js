@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto');
 const { query, pool } = require('../../../config/database');
 
 async function ensureTablesExist() {
+  // ── Core run table (original schema) ────────────────────────────────────────
   await query(`
     CREATE TABLE IF NOT EXISTS katalon_execution_runs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -25,6 +26,21 @@ async function ensureTablesExist() {
     )
   `);
 
+  // ── Migrations: add columns that may not exist on older instances ────────────
+  const migrations = [
+    `ALTER TABLE katalon_execution_runs ADD COLUMN IF NOT EXISTS suite_name TEXT`,
+    `ALTER TABLE katalon_execution_runs ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ`,
+    `ALTER TABLE katalon_execution_runs ADD COLUMN IF NOT EXISTS skipped_tests INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE katalon_execution_runs ADD COLUMN IF NOT EXISTS error_tests INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE katalon_execution_runs ADD COLUMN IF NOT EXISTS incomplete_tests INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE katalon_execution_runs ADD COLUMN IF NOT EXISTS report_path TEXT`,
+    `ALTER TABLE katalon_execution_runs ADD COLUMN IF NOT EXISTS parse_warning TEXT`,
+  ];
+  for (const sql of migrations) {
+    await query(sql);
+  }
+
+  // ── Log lines ────────────────────────────────────────────────────────────────
   await query(`
     CREATE TABLE IF NOT EXISTS katalon_execution_logs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,19 +50,33 @@ async function ensureTablesExist() {
       logged_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_kel_run_id ON katalon_execution_logs(run_id)`);
 
+  // ── Per-test-case results ────────────────────────────────────────────────────
   await query(`
-    CREATE INDEX IF NOT EXISTS idx_kel_run_id ON katalon_execution_logs(run_id)
+    CREATE TABLE IF NOT EXISTS execution_run_details (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      run_id UUID NOT NULL REFERENCES katalon_execution_runs(id) ON DELETE CASCADE,
+      test_case_name TEXT NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'PASSED',
+      duration_ms BIGINT NOT NULL DEFAULT 0,
+      error_message TEXT,
+      stack_trace TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
   `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_erd_run_id ON execution_run_details(run_id)`);
 }
+
+// ── Run CRUD ──────────────────────────────────────────────────────────────────
 
 async function createRun(data) {
   const id = randomUUID();
   const result = await query(
     `INSERT INTO katalon_execution_runs
        (id, project_id, katalon_executable_path, project_path, suite_path,
-        browser, os, profile, api_key, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'running')
+        suite_name, browser, os, profile, api_key, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'running')
      RETURNING *`,
     [
       id,
@@ -54,6 +84,7 @@ async function createRun(data) {
       data.katalon_executable_path || null,
       data.project_path,
       data.suite_path,
+      data.suite_name || null,
       data.browser || 'Chrome',
       data.os || null,
       data.profile || 'default',
@@ -64,7 +95,7 @@ async function createRun(data) {
 }
 
 async function updateRun(id, fields) {
-  const sets = [];
+  const sets   = [];
   const values = [];
   let idx = 1;
 
@@ -81,6 +112,8 @@ async function updateRun(id, fields) {
   );
 }
 
+// ── Log lines ─────────────────────────────────────────────────────────────────
+
 async function addLog(runId, level, message) {
   await query(
     `INSERT INTO katalon_execution_logs (id, run_id, level, message)
@@ -89,10 +122,50 @@ async function addLog(runId, level, message) {
   );
 }
 
+// ── Per-test-case details ─────────────────────────────────────────────────────
+
+/**
+ * Bulk-insert test case results for a run.
+ * @param {string} runId
+ * @param {Array<{ test_case_name, status, duration_ms, error_message, stack_trace }>} details
+ */
+async function addRunDetails(runId, details) {
+  if (!details || details.length === 0) return;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const d of details) {
+      await client.query(
+        `INSERT INTO execution_run_details
+           (id, run_id, test_case_name, status, duration_ms, error_message, stack_trace)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          randomUUID(),
+          runId,
+          d.test_case_name || 'Unknown',
+          (d.status || 'PASSED').toUpperCase(),
+          d.duration_ms || 0,
+          d.error_message || null,
+          d.stack_trace   || null,
+        ]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ── Queries ───────────────────────────────────────────────────────────────────
+
 async function listRuns({ page = 1, limit = 10, status } = {}) {
-  const offset = (page - 1) * limit;
+  const offset     = (page - 1) * limit;
   const conditions = [];
-  const values = [];
+  const values     = [];
   let idx = 1;
 
   if (status) {
@@ -105,10 +178,13 @@ async function listRuns({ page = 1, limit = 10, status } = {}) {
   const [dataResult, countResult] = await Promise.all([
     query(
       `SELECT r.id, r.project_id, p.name AS project_name,
-              r.project_path, r.suite_path, r.browser, r.os, r.profile,
+              r.project_path, r.suite_path, r.suite_name,
+              r.browser, r.os, r.profile,
               r.status, r.exit_code, r.duration_ms,
-              r.total_tests, r.passed_tests, r.failed_tests, r.error_message,
-              r.created_at, r.updated_at
+              r.total_tests, r.passed_tests, r.failed_tests,
+              r.skipped_tests, r.error_tests, r.incomplete_tests,
+              r.error_message, r.report_path, r.parse_warning,
+              r.created_at, r.ended_at, r.updated_at
        FROM katalon_execution_runs r
        LEFT JOIN projects p ON p.id = r.project_id
        ${where}
@@ -128,14 +204,11 @@ async function listRuns({ page = 1, limit = 10, status } = {}) {
 
 async function getStats() {
   const [statusResult, recentResult] = await Promise.all([
+    query(`SELECT status, COUNT(*) AS count FROM katalon_execution_runs GROUP BY status`),
     query(
-      `SELECT status, COUNT(*) AS count
-       FROM katalon_execution_runs
-       GROUP BY status`
-    ),
-    query(
-      `SELECT r.id, r.suite_path, r.status, r.passed_tests, r.failed_tests,
-              r.total_tests, r.duration_ms, r.created_at, p.name AS project_name
+      `SELECT r.id, r.suite_path, r.suite_name, r.status,
+              r.passed_tests, r.failed_tests, r.total_tests,
+              r.duration_ms, r.created_at, p.name AS project_name
        FROM katalon_execution_runs r
        LEFT JOIN projects p ON p.id = r.project_id
        ORDER BY r.created_at DESC
@@ -145,8 +218,6 @@ async function getStats() {
 
   const statusCounts = { passed: 0, failed: 0, error: 0, running: 0, pending: 0 };
   let totalRuns = 0;
-  let totalPassed = 0;
-  let totalFailed = 0;
 
   for (const row of statusResult.rows) {
     statusCounts[row.status] = parseInt(row.count, 10);
@@ -154,41 +225,55 @@ async function getStats() {
   }
 
   const avgResult = await query(
-    `SELECT AVG(duration_ms) AS avg_ms, SUM(passed_tests) AS total_passed, SUM(failed_tests) AS total_failed
+    `SELECT AVG(duration_ms) AS avg_ms,
+            SUM(passed_tests) AS total_passed,
+            SUM(failed_tests) AS total_failed
      FROM katalon_execution_runs
      WHERE status IN ('passed', 'failed')`
   );
 
-  totalPassed = parseInt(avgResult.rows[0].total_passed || 0, 10);
-  totalFailed = parseInt(avgResult.rows[0].total_failed || 0, 10);
-  const avgDurationMs = parseFloat(avgResult.rows[0].avg_ms || 0);
-
   return {
     totalRuns,
     statusCounts,
-    totalPassed,
-    totalFailed,
-    avgDurationMs,
-    recentRuns: recentResult.rows,
+    totalPassed:   parseInt(avgResult.rows[0].total_passed || 0, 10),
+    totalFailed:   parseInt(avgResult.rows[0].total_failed || 0, 10),
+    avgDurationMs: parseFloat(avgResult.rows[0].avg_ms || 0),
+    recentRuns:    recentResult.rows,
   };
 }
 
 async function getRun(id) {
   const runResult = await query(
-    `SELECT * FROM katalon_execution_runs WHERE id = $1`,
+    `SELECT r.*, p.name AS project_name
+     FROM katalon_execution_runs r
+     LEFT JOIN projects p ON p.id = r.project_id
+     WHERE r.id = $1`,
     [id]
   );
   if (runResult.rowCount === 0) return null;
 
-  const logsResult = await query(
-    `SELECT id, level, message, logged_at
-     FROM katalon_execution_logs
-     WHERE run_id = $1
-     ORDER BY logged_at ASC`,
-    [id]
-  );
+  const [logsResult, detailsResult] = await Promise.all([
+    query(
+      `SELECT id, level, message, logged_at
+       FROM katalon_execution_logs
+       WHERE run_id = $1
+       ORDER BY logged_at ASC`,
+      [id]
+    ),
+    query(
+      `SELECT id, test_case_name, status, duration_ms, error_message, stack_trace, created_at
+       FROM execution_run_details
+       WHERE run_id = $1
+       ORDER BY created_at ASC`,
+      [id]
+    ),
+  ]);
 
-  return { ...runResult.rows[0], logs: logsResult.rows };
+  return {
+    ...runResult.rows[0],
+    logs:            logsResult.rows,
+    testCaseDetails: detailsResult.rows,
+  };
 }
 
 async function deleteRun(id) {
@@ -200,6 +285,7 @@ module.exports = {
   createRun,
   updateRun,
   addLog,
+  addRunDetails,
   listRuns,
   getStats,
   getRun,
