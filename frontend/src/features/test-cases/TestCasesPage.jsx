@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ListChecks, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
 
 import { listProjects } from '../projects/projects.api';
@@ -9,7 +9,7 @@ import {
   listProjectTestCases,
   updateProjectTestCase
 } from './testCases.api';
-import { addSuiteTestCase, listProjectSuites } from '../suites/suites.api';
+import { addSuiteTestCase, deleteSuiteTestCase, listProjectSuites } from '../suites/suites.api';
 
 const STEPS_PLACEHOLDER = '[\n'
   + '  {\n'
@@ -140,6 +140,7 @@ const TestCasesPage = ({ addLog }) => {
 
   const [suites, setSuites] = useState([]);
   const [selectedSuiteIds, setSelectedSuiteIds] = useState(new Set());
+  const originalSuiteIdsRef = useRef(new Set());
 
   // Inline form validation error (shown in form, not just log)
   const [formError, setFormError] = useState('');
@@ -216,6 +217,7 @@ const TestCasesPage = ({ addLog }) => {
   async function selectTestCase(testCaseId) {
     setSelectedTestCaseId(testCaseId);
     setSelectedSuiteIds(new Set());
+    originalSuiteIdsRef.current = new Set();
     try {
       const data = await getProjectTestCase(selectedProjectId, testCaseId);
       const item = data.test_case;
@@ -228,6 +230,9 @@ const TestCasesPage = ({ addLog }) => {
         steps_json: JSON.stringify(item.steps || [], null, 2),
         data_sets_json: JSON.stringify(item.data_sets || [], null, 2)
       });
+      const linkedIds = new Set((item.linked_suites || []).map((s) => s.suite_id));
+      setSelectedSuiteIds(linkedIds);
+      originalSuiteIdsRef.current = new Set(linkedIds);
     } catch (error) {
       addLog(`Lỗi tải chi tiết test case: ${error.response?.data?.error || error.message}`, 'error');
     }
@@ -237,6 +242,7 @@ const TestCasesPage = ({ addLog }) => {
     setSelectedTestCaseId('');
     setForm(EMPTY_FORM);
     setSelectedSuiteIds(new Set());
+    originalSuiteIdsRef.current = new Set();
     setFormError('');
   }
 
@@ -280,6 +286,27 @@ const TestCasesPage = ({ addLog }) => {
         data = await updateProjectTestCase(selectedProjectId, selectedTestCaseId, payload);
         addLog(`Đã cập nhật test case: ${data.test_case.name}`, 'success');
         setFormError('');
+
+        // Diff suite links: add new, remove deselected
+        const original = originalSuiteIdsRef.current;
+        const toAdd    = [...selectedSuiteIds].filter((id) => !original.has(id));
+        const toRemove = [...original].filter((id) => !selectedSuiteIds.has(id));
+        for (const suiteId of toAdd) {
+          try {
+            await addSuiteTestCase(selectedProjectId, suiteId, { test_case_id: selectedTestCaseId });
+          } catch (err) {
+            addLog(`Lỗi liên kết suite: ${err.response?.data?.error || err.message}`, 'error');
+          }
+        }
+        for (const suiteId of toRemove) {
+          try {
+            await deleteSuiteTestCase(selectedProjectId, suiteId, selectedTestCaseId);
+          } catch (err) {
+            addLog(`Lỗi bỏ liên kết suite: ${err.response?.data?.error || err.message}`, 'error');
+          }
+        }
+        if (toAdd.length > 0) addLog(`Đã liên kết thêm ${toAdd.length} suite.`, 'success');
+        if (toRemove.length > 0) addLog(`Đã bỏ liên kết ${toRemove.length} suite.`, 'info');
       } else {
         data = await createProjectTestCase(selectedProjectId, payload);
         addLog(`Đã tạo test case: ${data.test_case.name}`, 'success');
@@ -382,7 +409,13 @@ const TestCasesPage = ({ addLog }) => {
                   <div className="object-item-info">
                     <div className="object-item-name">{testCase.name}</div>
                     <div className="object-item-meta">
-                      <span className="obj-locator-count">Linked {testCase.linked_suite_count || 0} suites</span>
+                      {(testCase.linked_suite_count || 0) === 0 ? (
+                        <span className="obj-locator-count" style={{ color: '#f87171' }} title="Chưa liên kết suite — sẽ không chạy được trong Run Engine">
+                          ⚠ Chưa liên kết suite
+                        </span>
+                      ) : (
+                        <span className="obj-locator-count">Linked {testCase.linked_suite_count} suites</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -505,20 +538,17 @@ const TestCasesPage = ({ addLog }) => {
                 </div>
               </div>
 
-              {/* Suite linking — only shown when creating a new test case */}
-              {!selectedTestCase && (
-                <div className="input-group">
-                  <label>
-                    Liên kết vào Test Suite
-                    <span style={{ color: 'var(--text-secondary)', fontWeight: 400, marginLeft: 4 }}>(tùy chọn)</span>
-                  </label>
-                  <SuiteMultiSelect
-                    suites={suites}
-                    selectedIds={selectedSuiteIds}
-                    onChange={setSelectedSuiteIds}
-                  />
-                </div>
-              )}
+              <div className="input-group">
+                <label>
+                  Liên kết vào Test Suite
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 400, marginLeft: 4 }}>(tùy chọn)</span>
+                </label>
+                <SuiteMultiSelect
+                  suites={suites}
+                  selectedIds={selectedSuiteIds}
+                  onChange={setSelectedSuiteIds}
+                />
+              </div>
 
               <button className="toolbar-btn run" onClick={handleSaveTestCase}>
                 <Save size={14} /> {selectedTestCase ? 'Cập nhật Test Case' : 'Tạo Test Case'}
