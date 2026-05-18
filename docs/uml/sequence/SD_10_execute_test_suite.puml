@@ -1,0 +1,64 @@
+@startuml SD_10_Execute_Test_Suite
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-10: Execute Test Suite — Yetiforce
+
+actor "QA Engineer" as User
+boundary "RunEngineForm" as RunForm
+control "ExecutionController" as ExecCtrl
+entity "ExecutionEntity" as ExecEntity
+
+User -> RunForm : selectProject()
+User -> RunForm : selectTestSuite()
+User -> RunForm : configureBrowser()
+User -> RunForm : submitStartExecution()
+
+RunForm -> ExecCtrl : startExecution(config)
+activate ExecCtrl
+
+ExecCtrl -> ExecCtrl : validateConfig(config)
+ExecCtrl -> ExecEntity : createRun(config)
+activate ExecEntity
+ExecEntity --> ExecCtrl : executionRun
+deactivate ExecEntity
+
+ExecCtrl --> RunForm : run, status=running
+RunForm --> User : showLiveLogPanel()
+
+ExecCtrl -> ExecEntity : executeRun(run, config)
+activate ExecEntity
+
+loop Streaming execution output
+  ExecEntity --> RunForm : logLine(level, message)
+  RunForm --> User : appendToLiveLog()
+end
+
+ExecEntity -> ExecEntity : parseReport()
+ExecEntity -> ExecEntity : extractTestResults()
+
+ExecEntity -> ExecEntity : saveResults(runId, testCases, summary)
+ExecEntity --> ExecCtrl : executionComplete
+deactivate ExecEntity
+
+alt Execution passed
+  ExecCtrl --> RunForm : status=passed, summary
+else Execution failed
+  ExecCtrl --> RunForm : status=failed, summary
+end
+
+deactivate ExecCtrl
+RunForm --> User : showExecutionSummary()
+
+@enduml

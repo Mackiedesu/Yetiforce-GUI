@@ -1,0 +1,52 @@
+@startuml SD_01_Login
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-01: User Login — Yetiforce
+
+actor "QA Engineer" as User
+boundary "LoginForm" as LoginForm
+control "AuthController" as AuthCtrl
+entity "UserEntity" as UserEntity
+
+User -> LoginForm : enterCredentials()
+User -> LoginForm : submitLogin()
+
+LoginForm -> LoginForm : validateFields()
+
+alt Validation fails
+  LoginForm --> User : showValidationError()
+else Validation passes
+  LoginForm -> AuthCtrl : login(username, password)
+  activate AuthCtrl
+
+  AuthCtrl -> UserEntity : verifyCredentials(username, password)
+  activate UserEntity
+  UserEntity --> AuthCtrl : result
+  deactivate UserEntity
+
+  alt Credentials valid
+    AuthCtrl -> AuthCtrl : generateToken(username)
+    AuthCtrl --> LoginForm : token, user
+    deactivate AuthCtrl
+    LoginForm -> LoginForm : storeSession(token)
+    LoginForm --> User : redirectToHome()
+  else Credentials invalid
+    AuthCtrl --> LoginForm : authenticationFailed()
+    deactivate AuthCtrl
+    LoginForm --> User : showErrorMessage()
+  end
+end
+
+@enduml

@@ -1,0 +1,80 @@
+@startuml UC_00_General_Overview
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #333333
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #333333
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam packageBorderColor #666666
+skinparam packageBackgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontName Arial
+
+title Yetiforce — General Use Case Overview
+
+left to right direction
+
+actor "QA Engineer" as QA
+actor "AI Service" as AI
+actor "Mocha +\nPlaywright" as KRE
+
+rectangle "Yetiforce" {
+
+  package "Authentication" {
+    usecase "Login to System" as UC_LOGIN
+  }
+
+  package "Project Management" {
+    usecase "Manage Projects" as UC_PROJ
+    usecase "Generate Project\nStructure" as UC_GEN
+    usecase "Import Existing\nProject" as UC_IMPORT
+  }
+
+  package "Test Management" {
+    usecase "Manage Test Suites" as UC_SUITE
+    usecase "Manage Test Cases" as UC_TC
+  }
+
+  package "AI QA Studio" {
+    usecase "Scan Website URL" as UC_SCAN
+    usecase "Generate Test Cases" as UC_AI_GEN
+    usecase "Save Generated\nTest Cases" as UC_SAVE
+  }
+
+  package "Execution" {
+    usecase "Execute Test Suite" as UC_EXEC
+    usecase "Monitor Execution" as UC_MON
+  }
+
+  package "Reporting" {
+    usecase "View Dashboard" as UC_DASH
+    usecase "View Execution\nReport" as UC_REPORT
+  }
+
+}
+
+QA --> UC_LOGIN
+QA --> UC_PROJ
+QA --> UC_GEN
+QA --> UC_IMPORT
+QA --> UC_SUITE
+QA --> UC_TC
+QA --> UC_SCAN
+QA --> UC_AI_GEN
+QA --> UC_SAVE
+QA --> UC_EXEC
+QA --> UC_DASH
+QA --> UC_REPORT
+
+UC_SCAN   .> UC_AI_GEN : <<include>>
+UC_AI_GEN --> AI
+UC_EXEC   --> KRE
+UC_EXEC   .> UC_MON   : <<include>>
+UC_DASH   .> UC_REPORT : <<extend>>
+UC_GEN    .> UC_PROJ  : <<include>>
+UC_SAVE   .> UC_TC    : <<include>>
+
+@enduml

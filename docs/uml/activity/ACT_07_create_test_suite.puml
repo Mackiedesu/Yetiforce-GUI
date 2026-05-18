@@ -1,0 +1,106 @@
+@startuml ACT_07_Create_Test_Suite
+' ============================================================
+' Title  : Activity Diagram — Create and Manage Test Suite
+' Version: 1.0
+' Export : java -jar plantuml.jar docs/uml/activity/ACT_07_create_test_suite.puml -tpng
+' ============================================================
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #333333
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam swimlaneBorderColor #666666
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title ACT-07: Create and Manage Test Suite
+
+|QA Engineer|
+start
+:Navigate to Test Suites tab;
+:Click "Create New Suite";
+:Enter suite name;
+:Enter suite description (optional);
+:Click Save;
+
+|System|
+:Receive create suite request;
+:Validate required fields;
+
+if (Fields valid?) then (no)
+  :Return validation error;
+
+  |QA Engineer|
+  :Correct input fields;
+  :Resubmit form;
+  |System|
+endif
+
+:Check suite name uniqueness within project;
+
+if (Name already exists?) then (yes)
+  :Return duplicate name error;
+
+  |QA Engineer|
+  :Enter different suite name;
+  :Resubmit form;
+  |System|
+endif
+
+:Create suite record in database;
+:Create suite spec file on disk\n(tests/suites/<suite-name>.spec.js);
+:Return created suite to client;
+
+|QA Engineer|
+:View newly created suite;
+:Click "Add Test Cases to Suite";
+:Browse available test cases in project;
+:Select one or more test cases;
+:Confirm selection;
+
+|System|
+:Validate selected test case IDs;
+:Assign execution order (auto-increment);
+
+fork
+  :Insert suite_test_case_links records;
+fork again
+  :Rebuild suite spec file on disk\nwith linked test cases;
+end fork
+
+:Return updated suite with linked test cases;
+
+|QA Engineer|
+:Review linked test cases;
+
+if (Reorder test cases?) then (yes)
+  :Drag-and-drop or set execution order;
+  :Click Save Order;
+
+  |System|
+  :Update execution_order in suite_test_case_links;
+  :Rebuild suite spec file with new order;
+  :Return updated order to client;
+
+  |QA Engineer|
+endif
+
+if (Remove a test case from suite?) then (yes)
+  :Select test case to remove;
+  :Click Remove;
+
+  |System|
+  :Delete suite_test_case_link record;
+  :Rebuild suite spec file without removed case;
+  :Return updated suite;
+
+  |QA Engineer|
+endif
+
+:Suite is ready for execution;
+stop
+
+@enduml

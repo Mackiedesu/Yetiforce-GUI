@@ -1,0 +1,66 @@
+@startuml ACT_03_Create_Test_Case
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #333333
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam swimlaneBorderColor #666666
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title ACT-03: Create Test Case Activity
+
+|QA Engineer|
+start
+:Select project;
+:Fill test case name and description;
+:Define test steps;
+:Set expected result;
+:Optionally set target URL and Playwright script;
+:Optionally define data sets;
+:Optionally select target test suites;
+:Click Save;
+
+|System|
+:Validate test case data;
+
+if (Valid?) then (no)
+  :Return validation error;
+  |QA Engineer|
+  :Correct and retry;
+  stop
+else (yes)
+endif
+
+:Save test case and steps to data store;
+
+:Get project path;
+
+if (Project path set?) then (yes)
+  :Write spec file (tests/cases/*.spec.js);
+
+  if (Disk write succeeds?) then (no)
+    :Delete test case from data store;
+    :Return disk error;
+    |QA Engineer|
+    :Display error message;
+    stop
+  else (yes)
+  endif
+else (no)
+endif
+
+if (Test suites selected?) then (yes)
+  :Link test case to each selected suite;
+  :Regenerate suite spec files on disk;
+else (no)
+endif
+
+|QA Engineer|
+:View test case in test case list;
+stop
+
+@enduml

@@ -1,0 +1,44 @@
+@startuml SD_09_AI_Test_Generation
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-09: Generate Test Cases via AI — Yetiforce
+
+actor "QA Engineer" as User
+boundary "AIStudioForm" as StudioForm
+control "AIGeneratorController" as AICtrl
+entity "AIGeneratorEntity" as AIEntity
+
+StudioForm -> AICtrl : generateTestCases(prompt)
+activate AICtrl
+
+AICtrl -> AIEntity : callAIService(prompt)
+activate AIEntity
+AIEntity -> AIEntity : sendRequest(model, prompt)
+AIEntity -> AIEntity : parseResponse()
+AIEntity -> AIEntity : normalizeTestCases()
+AIEntity --> AICtrl : testCases[]
+deactivate AIEntity
+
+alt Generation fails
+  AICtrl --> StudioForm : serviceError()
+  StudioForm --> User : showErrorMessage()
+else Generation succeeds
+  AICtrl -> AICtrl : validateTestCases()
+  AICtrl --> StudioForm : testCases[]
+  deactivate AICtrl
+  StudioForm --> User : displayTestCaseCards()
+end
+
+@enduml

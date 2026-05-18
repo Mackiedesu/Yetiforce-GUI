@@ -1,0 +1,73 @@
+@startuml ACT_02_Create_Project
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #333333
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam swimlaneBorderColor #666666
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title ACT-02: Create Project Activity
+
+|QA Engineer|
+start
+:Choose project creation mode;
+
+if (Mode?) then (Generate new)
+  :Fill project name, description;
+  :Browse and select save directory;
+  :Click Generate Project;
+
+  |System|
+  :Validate inputs;
+
+  if (Valid?) then (no)
+    :Return validation error;
+    |QA Engineer|
+    :Correct and retry;
+    stop
+  else (yes)
+  endif
+
+  :Check name uniqueness;
+
+  if (Name already exists?) then (yes)
+    :Return duplicate error;
+    |QA Engineer|
+    :Enter different name;
+    stop
+  else (no)
+  endif
+
+  :Generate Mocha + Playwright folder structure on disk;
+  :Save project to data store;
+
+else (Import existing)
+  :Fill project name;
+  :Browse and select existing project folder;
+  :Click Import Project;
+
+  |System|
+  :Validate project structure;
+  :Check for required folders (tests/suites/);
+
+  if (Valid project?) then (no)
+    :Return structure error;
+    |QA Engineer|
+    :Select correct folder;
+    stop
+  else (yes)
+  endif
+
+  :Save project to data store;
+endif
+
+|QA Engineer|
+:View project in project list;
+stop
+
+@enduml

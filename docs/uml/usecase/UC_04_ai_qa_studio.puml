@@ -1,0 +1,82 @@
+@startuml UC_04_AI_QA_Studio
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #333333
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #333333
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam packageBorderColor #666666
+skinparam packageBackgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontName Arial
+
+title AI QA Studio — Use Cases
+
+left to right direction
+
+actor "QA Engineer" as QA
+actor "AI Service" as AI
+
+rectangle "AI QA Studio Module" {
+
+  package "Input" {
+    usecase "Select Input Mode\n(URL / Text)" as UC_MODE
+    usecase "Enter Website URL" as UC_URL
+    usecase "Describe Feature\nin Text" as UC_TEXT
+  }
+
+  package "Data Collection" {
+    usecase "Scan Website\nfor Elements" as UC_SCAN
+    usecase "Extract Page\nElements" as UC_DOM
+  }
+
+  package "Test Case Generation" {
+    usecase "Generate Test Cases\nvia AI" as UC_GEN
+    usecase "Review Generated\nTest Cases" as UC_REVIEW
+    usecase "Edit Test Case" as UC_EDIT
+    usecase "Select Test Cases\nto Save" as UC_SELECT
+  }
+
+  package "Project Setup" {
+    usecase "Select Existing\nProject" as UC_SEL_PROJ
+    usecase "Create New Project\nfrom Studio" as UC_NEW_PROJ
+    usecase "Select Target\nTest Suite" as UC_SEL_SUITE
+  }
+
+  package "Save" {
+    usecase "Save Batch\nTest Cases" as UC_SAVE
+    usecase "Auto-link Test Cases\nto Suite" as UC_LINK
+  }
+
+}
+
+QA --> UC_MODE
+QA --> UC_URL
+QA --> UC_TEXT
+QA --> UC_REVIEW
+QA --> UC_EDIT
+QA --> UC_SELECT
+QA --> UC_SEL_PROJ
+QA --> UC_NEW_PROJ
+QA --> UC_SEL_SUITE
+QA --> UC_SAVE
+
+UC_MODE ..> UC_URL  : <<extend>>
+UC_MODE ..> UC_TEXT : <<extend>>
+
+UC_URL  .> UC_SCAN : <<include>>
+UC_SCAN .> UC_DOM  : <<include>>
+UC_DOM  .> UC_GEN  : <<include>>
+UC_TEXT .> UC_GEN  : <<include>>
+
+UC_GEN --> AI
+
+UC_REVIEW .> UC_EDIT   : <<extend>>
+UC_REVIEW .> UC_SELECT : <<include>>
+
+UC_SAVE .> UC_LINK : <<extend>>
+
+@enduml

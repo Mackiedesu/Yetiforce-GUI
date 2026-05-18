@@ -1,0 +1,63 @@
+@startuml SD_08_URL_Scan_DOM_Extraction
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-08: Scan URL and Extract DOM Elements — Yetiforce
+
+actor "QA Engineer" as User
+boundary "AIStudioForm" as StudioForm
+control "ScanController" as ScanCtrl
+entity "ScanEntity" as ScanEntity
+
+User -> StudioForm : enterUrl()
+User -> StudioForm : submitScan()
+
+StudioForm -> StudioForm : validateUrlFormat()
+
+alt URL invalid
+  StudioForm --> User : showUrlError()
+else URL valid
+  StudioForm -> ScanCtrl : scanUrl(url)
+  activate ScanCtrl
+
+  ScanCtrl -> ScanCtrl : validateUrl(url)
+  ScanCtrl -> ScanEntity : launchBrowser(url)
+  activate ScanEntity
+  ScanEntity -> ScanEntity : navigate(url)
+  ScanEntity -> ScanEntity : extractElements()
+  ScanEntity -> ScanEntity : closeBrowser()
+  ScanEntity --> ScanCtrl : elements[]
+  deactivate ScanEntity
+
+  alt No elements found
+    ScanCtrl --> StudioForm : noElementsError()
+    StudioForm --> User : showErrorMessage()
+  else Connection error
+    ScanCtrl --> StudioForm : connectionError()
+    StudioForm --> User : showConnectionError()
+  else Elements found
+    ScanCtrl --> StudioForm : elements[]
+    deactivate ScanCtrl
+    StudioForm --> User : displayElementSummary()
+  end
+end
+
+User -> StudioForm : submitGenerateTestCases()
+StudioForm -> ScanCtrl : generateFromElements(url, elements)
+activate ScanCtrl
+ScanCtrl -> ScanCtrl : buildDOMPrompt(url, elements)
+ScanCtrl --> StudioForm : prompt
+deactivate ScanCtrl
+
+@enduml

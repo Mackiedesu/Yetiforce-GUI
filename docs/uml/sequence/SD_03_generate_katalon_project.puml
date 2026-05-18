@@ -1,0 +1,62 @@
+@startuml SD_03_Generate_Mocha_Project
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-03: Generate Mocha Project — Yetiforce
+
+actor "QA Engineer" as User
+boundary "ProjectForm" as ProjectForm
+control "ProjectController" as ProjectCtrl
+entity "ProjectEntity" as ProjectEntity
+
+User -> ProjectForm : fillProjectDetails()
+User -> ProjectForm : selectDirectory()
+User -> ProjectForm : submitGenerate()
+
+ProjectForm -> ProjectForm : validateInputs()
+
+ProjectForm -> ProjectCtrl : generateProject(name, description, directory)
+activate ProjectCtrl
+
+ProjectCtrl -> ProjectCtrl : validateName()
+ProjectCtrl -> ProjectCtrl : validateDirectory()
+
+ProjectCtrl -> ProjectEntity : checkNameUnique(name)
+activate ProjectEntity
+ProjectEntity --> ProjectCtrl : isUnique
+deactivate ProjectEntity
+
+alt Name duplicate
+  ProjectCtrl --> ProjectForm : nameDuplicateError()
+  ProjectForm --> User : showError()
+else Name valid
+  ProjectCtrl -> ProjectEntity : createProjectStructure(directory, name)
+  activate ProjectEntity
+  ProjectEntity -> ProjectEntity : createFolders()
+  ProjectEntity -> ProjectEntity : writeProjectFiles()
+  ProjectEntity --> ProjectCtrl : projectPath
+  deactivate ProjectEntity
+
+  ProjectCtrl -> ProjectEntity : save(name, description, projectPath)
+  activate ProjectEntity
+  ProjectEntity --> ProjectCtrl : project
+  deactivate ProjectEntity
+
+  ProjectCtrl --> ProjectForm : project
+  deactivate ProjectCtrl
+
+  ProjectForm --> User : showProjectCreated()
+end
+
+@enduml

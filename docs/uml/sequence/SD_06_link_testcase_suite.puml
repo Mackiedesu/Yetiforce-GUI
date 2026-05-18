@@ -1,0 +1,56 @@
+@startuml SD_06_Link_TestCase_to_Suite
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-06: Link Test Case into Test Suite — Yetiforce
+
+actor "QA Engineer" as User
+boundary "SuiteManagementForm" as SuiteForm
+control "TestSuiteController" as SuiteCtrl
+entity "TestSuiteEntity" as SuiteEntity
+
+User -> SuiteForm : selectTestSuite()
+User -> SuiteForm : selectTestCase()
+User -> SuiteForm : submitLink()
+
+SuiteForm -> SuiteCtrl : linkTestCase(projectId, suiteId, testCaseId)
+activate SuiteCtrl
+
+SuiteCtrl -> SuiteEntity : assertSuiteExists(projectId, suiteId)
+activate SuiteEntity
+SuiteEntity --> SuiteCtrl : suiteFound
+deactivate SuiteEntity
+
+SuiteCtrl -> SuiteEntity : assertTestCaseExists(projectId, testCaseId)
+activate SuiteEntity
+SuiteEntity --> SuiteCtrl : testCaseFound
+deactivate SuiteEntity
+
+SuiteCtrl -> SuiteEntity : createLink(suiteId, testCaseId)
+activate SuiteEntity
+SuiteEntity -> SuiteEntity : getNextExecutionOrder()
+SuiteEntity -> SuiteEntity : insertSuiteTestCaseLink()
+SuiteEntity --> SuiteCtrl : updatedSuite
+deactivate SuiteEntity
+
+alt Link fails
+  SuiteCtrl --> SuiteForm : linkError()
+  SuiteForm --> User : showErrorMessage()
+else Link succeeds
+  SuiteCtrl --> SuiteForm : suite
+  deactivate SuiteCtrl
+  SuiteForm --> User : showLinkedSuccessfully()
+end
+
+@enduml

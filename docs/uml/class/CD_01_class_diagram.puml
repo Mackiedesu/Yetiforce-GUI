@@ -1,0 +1,268 @@
+@startuml CD_01_Class_Diagram
+' ============================================================
+' Title  : Class Diagram — QA Studio Platform (Yetiforce)
+' Version: 1.0
+' Export : java -jar plantuml.jar docs/uml/class/CD_01_class_diagram.puml -tpng -o ./output
+'          Recommended: -tsvg for scalable vector output
+' ============================================================
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #333333
+skinparam arrowColor #333333
+skinparam classHeaderBackgroundColor #EEEEEE
+skinparam classAttributeIconSize 0
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+skinparam packageBorderColor #888888
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 12
+skinparam packageFontStyle bold
+skinparam nodesep 45
+skinparam ranksep 50
+
+title Class Diagram — QA Studio Platform
+
+' ========================
+' AUTHENTICATION
+' ========================
+package "Authentication" <<Frame>> {
+  class User {
+    - id : UUID
+    - username : String
+    - passwordHash : String
+    - role : String
+    - createdAt : DateTime
+    --
+    + login(credentials : LoginDto) : AuthToken
+    + validateToken(token : String) : Boolean
+    + logout() : void
+  }
+}
+
+' ========================
+' PROJECT MANAGEMENT
+' ========================
+package "Project Management" <<Frame>> {
+  class Project {
+    - id : UUID
+    - name : String
+    - description : String
+    - projectPath : String
+    - createdAt : DateTime
+    - updatedAt : DateTime
+    --
+    + create(dto : ProjectDto) : Project
+    + update(dto : ProjectDto) : Project
+    + delete() : void
+    + generateScaffold() : void
+    + importExisting(path : String) : Project
+    + getStructure() : FileTree
+    + scanSuites() : List~TestSuite~
+  }
+}
+
+' ========================
+' TEST MANAGEMENT
+' ========================
+package "Test Management" <<Frame>> {
+
+  class TestSuite {
+    - id : UUID
+    - projectId : UUID
+    - name : String
+    - description : String
+    - createdAt : DateTime
+    - updatedAt : DateTime
+    --
+    + create(dto : SuiteDto) : TestSuite
+    + update(dto : SuiteDto) : TestSuite
+    + delete() : void
+    + addTestCase(tcId : UUID, order : Integer) : void
+    + removeTestCase(tcId : UUID) : void
+    + reorder(orderedIds : List~UUID~) : void
+    + syncToDisk() : void
+  }
+
+  class TestCase {
+    - id : UUID
+    - projectId : UUID
+    - name : String
+    - description : String
+    - targetUrl : String
+    - expectedResult : String
+    - scriptContent : String
+    - scannedDomJson : JSON
+    - createdAt : DateTime
+    - updatedAt : DateTime
+    --
+    + create(dto : TestCaseDto) : TestCase
+    + update(dto : TestCaseDto) : TestCase
+    + delete() : void
+    + getSteps() : List~TestCaseStep~
+    + getDataSets() : List~TestCaseDataSet~
+    + syncToDisk() : void
+  }
+
+  class TestCaseStep {
+    - id : UUID
+    - testCaseId : UUID
+    - parentStepId : UUID {nullable}
+    - title : String
+    - description : String
+    - expectedResult : String
+    - stepOrder : Integer
+    - createdAt : DateTime
+    --
+    + getChildren() : List~TestCaseStep~
+    + addChild(step : TestCaseStep) : TestCaseStep
+    + move(newParentId : UUID, order : Integer) : void
+  }
+
+  class TestCaseDataSet {
+    - id : UUID
+    - testCaseId : UUID
+    - name : String
+    - dataJson : JSON
+    - createdAt : DateTime
+    - updatedAt : DateTime
+    --
+    + create(dto : DataSetDto) : TestCaseDataSet
+    + update(dto : DataSetDto) : TestCaseDataSet
+    + delete() : void
+  }
+
+  class SuiteTestCaseLink {
+    - id : UUID
+    - suiteId : UUID
+    - testCaseId : UUID
+    - executionOrder : Integer
+    - createdAt : DateTime
+    --
+    + link(suiteId : UUID, tcId : UUID, order : Integer) : SuiteTestCaseLink
+    + unlink() : void
+    + reorder(newOrder : Integer) : void
+  }
+}
+
+' ========================
+' EXECUTION
+' ========================
+package "Execution" <<Frame>> {
+
+  class ExecutionRun {
+    - id : UUID
+    - projectId : UUID
+    - suitePath : String
+    - suiteName : String
+    - browser : String
+    - status : ExecutionStatus
+    - exitCode : Integer
+    - durationMs : Long
+    - totalTests : Integer
+    - passedTests : Integer
+    - failedTests : Integer
+    - reportPath : String
+    - createdAt : DateTime
+    - endedAt : DateTime
+    --
+    + start(config : ExecConfig) : ExecutionRun
+    + updateStatus(status : ExecutionStatus, stats : RunStats) : void
+    + parseReport() : void
+    + delete() : void
+  }
+
+  class ExecutionLog {
+    - id : UUID
+    - runId : UUID
+    - level : LogLevel
+    - message : String
+    - loggedAt : DateTime
+    --
+    + append(level : LogLevel, message : String) : ExecutionLog
+  }
+
+  class ExecutionRunDetail {
+    - id : UUID
+    - runId : UUID
+    - testCaseName : String
+    - status : TestStatus
+    - durationMs : Long
+    - errorMessage : String
+    - stackTrace : String
+    - createdAt : DateTime
+    --
+    + save(runId : UUID, result : TestResult) : ExecutionRunDetail
+  }
+
+  enum ExecutionStatus {
+    PENDING
+    RUNNING
+    SUCCESS
+    FAILED
+    ERROR
+  }
+
+  enum TestStatus {
+    PASSED
+    FAILED
+    PENDING
+    ERROR
+  }
+}
+
+' ========================
+' AI GENERATION
+' ========================
+package "AI Generation" <<Frame>> {
+
+  class AIGenerationRequest {
+    - id : UUID
+    - projectId : UUID
+    - inputType : InputType
+    - targetUrl : String
+    - domSnapshot : JSON
+    - generatedCount : Integer
+    - createdAt : DateTime
+    --
+    + scanUrl(url : String) : DomSnapshot
+    + generate(input : GenerateDto) : List~TestCase~
+    + saveBatch(testCases : List~TestCase~) : List~TestCase~
+  }
+
+  enum InputType {
+    URL_SCAN
+    TEXT_DESCRIPTION
+  }
+}
+
+' ========================
+' RELATIONSHIPS
+' ========================
+
+User "1" ..> "0..*" Project         : manages
+User "1" ..> "0..*" ExecutionRun    : triggers
+
+Project       "1"    *--  "0..*" TestSuite           : contains >
+Project       "1"    *--  "0..*" TestCase             : owns >
+Project       "1"    o--  "0..*" ExecutionRun         : records >
+
+TestSuite     "1"    *--  "1..*" SuiteTestCaseLink    : orders >
+TestCase      "1"    o--  "0..*" SuiteTestCaseLink    : included via >
+
+TestCase      "1"    *--  "0..*" TestCaseStep         : defines >
+TestCase      "1"    *--  "0..*" TestCaseDataSet      : parameterized by >
+
+TestCaseStep  "0..1" o--  "0..*" TestCaseStep         : parent of >
+
+ExecutionRun  "1"    *--  "0..*" ExecutionLog         : streams >
+ExecutionRun  "1"    *--  "0..*" ExecutionRunDetail   : records >
+ExecutionRun         ..>          ExecutionStatus      : uses
+ExecutionRunDetail   ..>          TestStatus           : uses
+
+AIGenerationRequest  ..>  "0..*"  TestCase             : produces >
+AIGenerationRequest  ..>           Project              : generates for
+AIGenerationRequest  ..>           InputType            : categorized by
+
+@enduml

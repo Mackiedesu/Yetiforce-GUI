@@ -1,0 +1,69 @@
+@startuml UC_05_Run_Engine_Execution
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #333333
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #333333
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam packageBorderColor #666666
+skinparam packageBackgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontName Arial
+
+title Run Engine — Execution Use Cases
+
+left to right direction
+
+actor "QA Engineer" as QA
+actor "Mocha +\nPlaywright" as KRE
+
+rectangle "Run Engine Module" {
+
+  package "Configuration" {
+    usecase "Select Project" as UC_SEL_PROJ
+    usecase "Scan Test Suites" as UC_SCAN
+    usecase "Select Test Suite" as UC_SEL_SUITE
+    usecase "Configure Browser\nand Profile" as UC_CONFIG
+  }
+
+  package "Execution" {
+    usecase "Start Execution" as UC_START
+    usecase "Monitor Live\nExecution Log" as UC_LIVE
+    usecase "View Execution\nProgress" as UC_PROGRESS
+  }
+
+  package "Execution History" {
+    usecase "View Execution\nHistory" as UC_HISTORY
+    usecase "View Execution\nLogs" as UC_LOGS
+    usecase "View Test Case\nResults" as UC_TC_TAB
+    usecase "View Execution\nConfiguration" as UC_CONFIG_TAB
+    usecase "Delete Execution\nRecord" as UC_DELETE
+  }
+
+}
+
+QA --> UC_SEL_PROJ
+QA --> UC_SCAN
+QA --> UC_SEL_SUITE
+QA --> UC_CONFIG
+QA --> UC_START
+QA --> UC_LIVE
+QA --> UC_HISTORY
+QA --> UC_DELETE
+
+UC_SEL_PROJ .> UC_SCAN     : <<include>>
+UC_SCAN     .> UC_SEL_SUITE : <<include>>
+UC_SEL_SUITE .> UC_CONFIG  : <<include>>
+
+UC_START .> UC_LIVE     : <<include>>
+UC_START .> UC_PROGRESS : <<include>>
+UC_START --> KRE
+
+UC_HISTORY .> UC_LOGS       : <<extend>>
+UC_HISTORY .> UC_TC_TAB     : <<extend>>
+UC_HISTORY .> UC_CONFIG_TAB : <<extend>>
+
+@enduml

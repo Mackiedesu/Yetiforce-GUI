@@ -1,0 +1,63 @@
+@startuml SD_15_Import_Mocha_Project
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-15: Import Existing Mocha Engine Project — Yetiforce
+
+actor "QA Engineer" as User
+boundary "ProjectForm" as ProjectForm
+control "ProjectController" as ProjectCtrl
+entity "ProjectEntity" as ProjectEntity
+
+User -> ProjectForm : enterProjectName()
+User -> ProjectForm : selectProjectFolder()
+User -> ProjectForm : submitImport()
+
+ProjectForm -> ProjectForm : validateInputs()
+
+ProjectForm -> ProjectCtrl : importProject(name, projectPath)
+activate ProjectCtrl
+
+ProjectCtrl -> ProjectEntity : validateProjectStructure(projectPath)
+activate ProjectEntity
+ProjectEntity -> ProjectEntity : checkPathExists()
+ProjectEntity -> ProjectEntity : checkRequiredFolders()
+ProjectEntity --> ProjectCtrl : validationResult
+deactivate ProjectEntity
+
+alt Structure invalid
+  ProjectCtrl --> ProjectForm : invalidStructureError()
+  ProjectForm --> User : showErrorMessage()
+else Structure valid
+  ProjectCtrl -> ProjectEntity : checkNameUnique(name)
+  activate ProjectEntity
+  ProjectEntity --> ProjectCtrl : isUnique
+  deactivate ProjectEntity
+
+  alt Name already exists
+    ProjectCtrl --> ProjectForm : duplicateNameError()
+    ProjectForm --> User : showErrorMessage()
+  else Name available
+    ProjectCtrl -> ProjectEntity : save(name, projectPath)
+    activate ProjectEntity
+    ProjectEntity --> ProjectCtrl : project
+    deactivate ProjectEntity
+
+    ProjectCtrl --> ProjectForm : project
+    deactivate ProjectCtrl
+    ProjectForm --> User : showImportedSuccessfully()
+  end
+end
+
+@enduml

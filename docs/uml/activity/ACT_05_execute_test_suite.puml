@@ -1,0 +1,65 @@
+@startuml ACT_05_Execute_Test_Suite
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #333333
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam swimlaneBorderColor #666666
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title ACT-05: Execute Test Suite Activity
+
+|QA Engineer|
+start
+:Select project;
+:Scan available test suites;
+:Select test suite from tree;
+:Configure browser and profile;
+:Click Start Execution;
+
+|System|
+:Validate execution configuration;
+:Create execution run record (status: running);
+:Notify user of execution start;
+
+|Mocha + Playwright|
+:Ensure Playwright browser installed;
+:Spawn Mocha process via Node.js;
+:Run test suite;
+
+|System|
+fork
+  :Stream execution logs to screen;
+fork again
+  |QA Engineer|
+  :Monitor live log output;
+end fork
+
+|Mocha + Playwright|
+:Complete test execution;
+:Return exit code;
+
+|System|
+:Locate execution report;
+
+if (Mochawesome JSON report found?) then (yes)
+  :Parse test case results from JSON;
+else (no)
+  :Extract aggregate counts from output;
+endif
+
+:Save execution results to data store;
+:Update run record (status, stats);
+:Notify user of completion;
+
+|QA Engineer|
+:View execution summary;
+:Review test case results;
+:Check logs and stack traces if needed;
+stop
+
+@enduml

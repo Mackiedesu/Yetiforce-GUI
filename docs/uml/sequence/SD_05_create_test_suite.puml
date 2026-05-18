@@ -1,0 +1,56 @@
+@startuml SD_05_Create_Test_Suite
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-05: Create Test Suite — Yetiforce
+
+actor "QA Engineer" as User
+boundary "TestSuiteForm" as SuiteForm
+control "TestSuiteController" as SuiteCtrl
+entity "TestSuiteEntity" as SuiteEntity
+
+User -> SuiteForm : selectProject()
+User -> SuiteForm : fillSuiteDetails()
+User -> SuiteForm : addInlineTestCases()
+User -> SuiteForm : submitCreate()
+
+SuiteForm -> SuiteCtrl : createSuite(projectId, suiteData)
+activate SuiteCtrl
+
+SuiteCtrl -> SuiteCtrl : validatePayload()
+SuiteCtrl -> SuiteEntity : assertProjectExists(projectId)
+activate SuiteEntity
+SuiteEntity --> SuiteCtrl : projectFound
+deactivate SuiteEntity
+
+SuiteCtrl -> SuiteEntity : save(projectId, suiteData)
+activate SuiteEntity
+SuiteEntity -> SuiteEntity : insertTestSuite()
+loop for each inline test case
+  SuiteEntity -> SuiteEntity : insertTestCase()
+  SuiteEntity -> SuiteEntity : insertSuiteLink()
+end
+SuiteEntity --> SuiteCtrl : suite
+deactivate SuiteEntity
+
+alt Save fails
+  SuiteCtrl --> SuiteForm : saveError()
+  SuiteForm --> User : showErrorMessage()
+else Save succeeds
+  SuiteCtrl --> SuiteForm : suite
+  deactivate SuiteCtrl
+  SuiteForm --> User : showSuiteCreated()
+end
+
+@enduml

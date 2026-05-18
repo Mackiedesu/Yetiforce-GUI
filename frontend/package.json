@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "screenshots": "node scripts/capture-screenshots.js",
+    "playwright:install": "playwright install chromium"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

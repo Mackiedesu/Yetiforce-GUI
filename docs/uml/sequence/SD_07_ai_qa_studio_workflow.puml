@@ -1,0 +1,80 @@
+@startuml SD_07_AI_QA_Studio_Workflow
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-07: AI QA Studio — Generate and Save Test Cases — Yetiforce
+
+actor "QA Engineer" as User
+boundary "AIStudioForm" as StudioForm
+control "AIStudioController" as AICtrl
+entity "TestCaseEntity" as TCEntity
+
+User -> StudioForm : selectProject()
+User -> StudioForm : selectInputMode()
+
+alt URL Scan Mode
+  User -> StudioForm : enterUrl()
+  User -> StudioForm : submitScan()
+  StudioForm -> AICtrl : scanUrl(url)
+  activate AICtrl
+  AICtrl -> AICtrl : extractPageElements(url)
+  AICtrl -> AICtrl : buildPromptFromDOM(url, elements)
+  AICtrl --> StudioForm : elements
+  deactivate AICtrl
+else Text Describe Mode
+  User -> StudioForm : enterDescription()
+  User -> StudioForm : submitGenerate()
+  StudioForm -> AICtrl : generateFromText(description)
+  activate AICtrl
+  AICtrl -> AICtrl : buildPromptFromText(description)
+  AICtrl --> StudioForm : prompt
+  deactivate AICtrl
+end
+
+StudioForm -> AICtrl : generateTestCases(prompt)
+activate AICtrl
+AICtrl -> AICtrl : callAIService(prompt)
+AICtrl --> StudioForm : testCases[]
+deactivate AICtrl
+
+StudioForm --> User : displayGeneratedTestCases()
+User -> StudioForm : reviewAndSelectTestCases()
+User -> StudioForm : selectTargetSuite()
+User -> StudioForm : submitSave()
+
+StudioForm -> AICtrl : saveBatchTestCases(projectId, testCases[])
+activate AICtrl
+
+loop for each test case
+  AICtrl -> TCEntity : save(projectId, testCase)
+  activate TCEntity
+  TCEntity --> AICtrl : savedTestCase
+  deactivate TCEntity
+end
+
+alt Suite selected
+  loop for each saved test case
+    AICtrl -> TCEntity : linkToSuite(suiteId, testCaseId)
+    activate TCEntity
+    TCEntity --> AICtrl : linked
+    deactivate TCEntity
+  end
+end
+
+AICtrl --> StudioForm : savedTestCases[]
+deactivate AICtrl
+
+StudioForm --> User : showSavedSuccessfully()
+
+@enduml

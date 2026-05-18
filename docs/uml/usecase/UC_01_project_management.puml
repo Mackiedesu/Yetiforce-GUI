@@ -1,0 +1,57 @@
+@startuml UC_01_Project_Management
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #333333
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #333333
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam packageBorderColor #666666
+skinparam packageBackgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontName Arial
+
+title Project Management — Use Cases
+
+left to right direction
+
+actor "QA Engineer" as QA
+
+rectangle "Project Management Module" {
+
+  usecase "List Projects" as UC_LIST
+  usecase "Create Project" as UC_CREATE
+  usecase "Generate Project\nStructure on Disk" as UC_GEN
+  usecase "Import Existing\nProject" as UC_IMPORT
+  usecase "Update Project" as UC_UPDATE
+  usecase "Delete Project" as UC_DELETE
+  usecase "View Project\nFolder Structure" as UC_STRUCT
+
+  usecase "Validate Project\nName" as UC_VALID_NAME
+  usecase "Validate Project\nDirectory" as UC_VALID_DIR
+  usecase "Validate Project\nStructure" as UC_VALID_KAT
+  usecase "Browse File System" as UC_BROWSE
+
+}
+
+QA --> UC_LIST
+QA --> UC_CREATE
+QA --> UC_GEN
+QA --> UC_IMPORT
+QA --> UC_UPDATE
+QA --> UC_DELETE
+QA --> UC_STRUCT
+QA --> UC_BROWSE
+
+UC_CREATE .> UC_VALID_NAME : <<include>>
+UC_GEN    .> UC_VALID_NAME : <<include>>
+UC_GEN    .> UC_VALID_DIR  : <<include>>
+UC_IMPORT .> UC_VALID_KAT  : <<include>>
+
+UC_CREATE ..> UC_BROWSE : <<extend>>
+UC_GEN    ..> UC_BROWSE : <<extend>>
+UC_IMPORT ..> UC_BROWSE : <<extend>>
+
+@enduml

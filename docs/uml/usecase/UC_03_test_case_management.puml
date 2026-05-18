@@ -1,0 +1,66 @@
+@startuml UC_03_Test_Case_Management
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #333333
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #333333
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam packageBorderColor #666666
+skinparam packageBackgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontName Arial
+
+title Test Case Management — Use Cases
+
+left to right direction
+
+actor "QA Engineer" as QA
+
+rectangle "Test Case Management Module" {
+
+  package "Test Case Operations" {
+    usecase "Create Test Case" as UC_CREATE
+    usecase "View Test Case Details" as UC_VIEW
+    usecase "Update Test Case" as UC_UPDATE
+    usecase "Delete Test Case" as UC_DELETE
+    usecase "List Test Cases" as UC_LIST
+  }
+
+  package "Test Case Contents" {
+    usecase "Define Test Steps" as UC_STEPS
+    usecase "Define Data Sets" as UC_DATA
+    usecase "Set Target URL\nand Script" as UC_SCRIPT
+    usecase "Set Expected Result" as UC_RESULT
+  }
+
+  package "Suite Association" {
+    usecase "Link to Test Suites" as UC_LINK
+    usecase "Remove from\nTest Suite" as UC_UNLINK
+    usecase "View Linked Suites" as UC_VIEW_SUITES
+  }
+
+  usecase "Sync Test Case\nFiles to Disk" as UC_SYNC
+
+}
+
+QA --> UC_CREATE
+QA --> UC_VIEW
+QA --> UC_UPDATE
+QA --> UC_DELETE
+QA --> UC_LIST
+QA --> UC_LINK
+
+UC_CREATE .> UC_STEPS  : <<include>>
+UC_CREATE .> UC_RESULT : <<include>>
+UC_CREATE ..> UC_DATA   : <<extend>>
+UC_CREATE ..> UC_SCRIPT : <<extend>>
+UC_CREATE .> UC_SYNC   : <<include>>
+UC_UPDATE .> UC_SYNC   : <<include>>
+
+UC_LINK .> UC_VIEW_SUITES : <<include>>
+UC_LINK ..> UC_UNLINK      : <<extend>>
+
+@enduml

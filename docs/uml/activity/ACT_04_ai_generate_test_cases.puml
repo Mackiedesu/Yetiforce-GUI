@@ -1,0 +1,91 @@
+@startuml ACT_04_AI_Generate_Test_Cases
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #333333
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam swimlaneBorderColor #666666
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title ACT-04: AI Test Case Generation Activity
+
+|QA Engineer|
+start
+:Open AI QA Studio;
+:Select or create project;
+:Choose input mode;
+
+if (Input mode?) then (URL Scan)
+  :Enter website URL;
+  :Click Scan Website;
+
+  |System|
+  :Validate URL format;
+
+  if (Valid URL?) then (no)
+    :Return URL error;
+    |QA Engineer|
+    :Correct URL;
+    stop
+  else (yes)
+  endif
+
+  :Launch headless browser;
+  :Navigate to website;
+  :Extract page elements;
+  :Build prompt from DOM context;
+
+else (Text Description)
+  |QA Engineer|
+  :Enter feature description;
+  :Click Generate;
+
+  |System|
+  :Build prompt from text;
+endif
+
+|AI Service|
+:Receive generation prompt;
+:Generate test cases;
+
+if (Generation successful?) then (no)
+  :Retry with fallback model;
+
+  if (All retries exhausted?) then (yes)
+    |System|
+    :Return service error;
+    |QA Engineer|
+    :Display error and retry;
+    stop
+  else (no)
+  endif
+else (yes)
+endif
+
+:Return generated test cases;
+
+|QA Engineer|
+:Review generated test case cards;
+:Edit, select, or deselect test cases;
+:Select target test suite (optional);
+:Click Save to Project;
+
+|System|
+:Save selected test cases to data store;
+:Write test case files to disk;
+
+if (Suite selected?) then (yes)
+  :Link test cases to suite;
+  :Regenerate suite file on disk;
+else (no)
+endif
+
+|QA Engineer|
+:View confirmation of saved test cases;
+stop
+
+@enduml

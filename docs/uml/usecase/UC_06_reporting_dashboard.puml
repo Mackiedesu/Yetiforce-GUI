@@ -1,0 +1,70 @@
+@startuml UC_06_Reporting_Dashboard
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #333333
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #333333
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam packageBorderColor #666666
+skinparam packageBackgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontName Arial
+
+title Reporting and Dashboard — Use Cases
+
+left to right direction
+
+actor "QA Engineer" as QA
+
+rectangle "Reporting and Dashboard Module" {
+
+  package "Dashboard Analytics" {
+    usecase "View Execution\nDashboard" as UC_DASH
+    usecase "View Summary\nStatistics" as UC_STATS
+    usecase "View Status\nBreakdown Chart" as UC_PIE
+    usecase "View Pass/Fail\nTrend Chart" as UC_BAR
+  }
+
+  package "Execution History" {
+    usecase "List Executions" as UC_LIST
+    usecase "Filter by Status" as UC_FILTER
+    usecase "View Inline\nRun Detail" as UC_EXPAND
+    usecase "Navigate to\nRun Detail" as UC_VIEW_RPT
+  }
+
+  package "Run Detail View" {
+    usecase "View Run Summary" as UC_SUMMARY
+    usecase "View Execution\nLogs" as UC_LOGS
+    usecase "View Test Case\nResults" as UC_TC_TAB
+    usecase "Expand Stack\nTrace" as UC_TRACE
+  }
+
+}
+
+QA --> UC_DASH
+QA --> UC_LIST
+QA --> UC_FILTER
+QA --> UC_EXPAND
+QA --> UC_VIEW_RPT
+QA --> UC_LOGS
+QA --> UC_TC_TAB
+QA --> UC_TRACE
+
+UC_DASH .> UC_STATS : <<include>>
+UC_DASH .> UC_PIE   : <<include>>
+UC_DASH .> UC_BAR   : <<include>>
+UC_DASH .> UC_LIST  : <<include>>
+
+UC_LIST .> UC_FILTER   : <<extend>>
+UC_LIST .> UC_EXPAND   : <<extend>>
+UC_LIST .> UC_VIEW_RPT : <<extend>>
+
+UC_VIEW_RPT .> UC_SUMMARY : <<include>>
+UC_SUMMARY  .> UC_LOGS    : <<include>>
+UC_SUMMARY  .> UC_TC_TAB  : <<include>>
+UC_TC_TAB   .> UC_TRACE   : <<extend>>
+
+@enduml

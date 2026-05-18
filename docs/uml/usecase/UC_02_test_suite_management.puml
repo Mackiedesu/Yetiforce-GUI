@@ -1,0 +1,67 @@
+@startuml UC_02_Test_Suite_Management
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #333333
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #333333
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam packageBorderColor #666666
+skinparam packageBackgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontName Arial
+
+title Test Suite Management — Use Cases
+
+left to right direction
+
+actor "QA Engineer" as QA
+
+rectangle "Test Suite Management Module" {
+
+  package "Suite Operations" {
+    usecase "Create Test Suite" as UC_CREATE
+    usecase "Update Test Suite" as UC_UPDATE
+    usecase "Delete Test Suite" as UC_DELETE
+    usecase "List Test Suites" as UC_LIST
+  }
+
+  package "Test Case Linking" {
+    usecase "Add New Test Case\nto Suite" as UC_ADD_NEW
+    usecase "Link Existing\nTest Case to Suite" as UC_LINK
+    usecase "Remove Test Case\nfrom Suite" as UC_REMOVE
+    usecase "Reorder Test Cases\nin Suite" as UC_REORDER
+  }
+
+  package "Suite Discovery" {
+    usecase "Scan Test Suites\nFolder" as UC_SCAN
+    usecase "Browse Suite\nTree" as UC_TREE
+    usecase "Select Suite\nfrom Tree" as UC_SELECT
+  }
+
+  usecase "Sync Suite File\nto Disk" as UC_SYNC
+
+}
+
+QA --> UC_CREATE
+QA --> UC_UPDATE
+QA --> UC_DELETE
+QA --> UC_LIST
+QA --> UC_ADD_NEW
+QA --> UC_LINK
+QA --> UC_REMOVE
+QA --> UC_REORDER
+QA --> UC_SCAN
+QA --> UC_SELECT
+
+UC_CREATE  .> UC_SYNC : <<include>>
+UC_ADD_NEW .> UC_SYNC : <<include>>
+UC_LINK    .> UC_SYNC : <<include>>
+UC_REMOVE  .> UC_SYNC : <<include>>
+UC_UPDATE  .> UC_SYNC : <<include>>
+UC_SCAN    .> UC_TREE : <<include>>
+UC_TREE    .> UC_SELECT : <<include>>
+
+@enduml

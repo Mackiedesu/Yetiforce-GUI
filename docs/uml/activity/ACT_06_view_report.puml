@@ -1,0 +1,79 @@
+@startuml ACT_06_View_Report
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #333333
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam swimlaneBorderColor #666666
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title ACT-06: View Execution Report Activity
+
+|QA Engineer|
+start
+:Open Dashboard;
+
+|System|
+:Load execution statistics;
+:Load recent execution history;
+:Render summary charts;
+
+|QA Engineer|
+:View statistics and charts;
+:Browse execution history table;
+
+if (Filter by status?) then (yes)
+  :Select status filter;
+  |System|
+  :Reload filtered list;
+  |QA Engineer|
+else (no)
+endif
+
+:Click on execution row;
+
+if (View inline detail?) then (yes)
+  |System|
+  :Load run summary and logs;
+  |QA Engineer|
+  :Read inline detail;
+else (no - View Report button)
+  |System|
+  :Navigate to Run Detail screen;
+  :Load full run detail;
+
+  |QA Engineer|
+  :View run summary header;
+
+  if (Check logs?) then (yes)
+    :Open Logs tab;
+    |System|
+    :Display all log lines;
+    |QA Engineer|
+  else (no)
+  endif
+
+  if (Check test case results?) then (yes)
+    :Open Test Cases tab;
+
+    if (Filter by status?) then (yes)
+      :Apply status filter;
+    else (no)
+    endif
+
+    if (Expand stack trace?) then (yes)
+      :View full error details;
+    else (no)
+    endif
+  else (no)
+  endif
+endif
+
+:Done reviewing;
+stop
+
+@enduml

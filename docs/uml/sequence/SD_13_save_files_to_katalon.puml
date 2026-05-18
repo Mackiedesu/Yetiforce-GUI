@@ -1,0 +1,61 @@
+@startuml SD_13_Save_Spec_Files
+!theme plain
+skinparam handwritten false
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam roundcorner 5
+skinparam maxMessageSize 120
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #FFFFFF
+skinparam sequenceLifeLineBorderColor #999999
+skinparam defaultFontSize 11
+skinparam defaultFontName Arial
+
+title SD-13: Save Test Artifacts to Project — Yetiforce
+
+actor "QA Engineer" as User
+boundary "TestCaseForm" as TCForm
+control "ProjectController" as ProjectCtrl
+entity "ProjectEntity" as ProjectEntity
+
+User -> TCForm : saveTestArtifact()
+
+TCForm -> ProjectCtrl : writeTestCaseFile(projectId, testCase)
+activate ProjectCtrl
+
+ProjectCtrl -> ProjectEntity : getProjectPath(projectId)
+activate ProjectEntity
+ProjectEntity --> ProjectCtrl : projectPath
+deactivate ProjectEntity
+
+ProjectCtrl -> ProjectEntity : writeTestCaseFile(projectPath, testCase)
+activate ProjectEntity
+ProjectEntity -> ProjectEntity : sanitizeFilename()
+ProjectEntity -> ProjectEntity : ensureDirectory()
+ProjectEntity -> ProjectEntity : writeSpecFile()
+ProjectEntity --> ProjectCtrl : result
+deactivate ProjectEntity
+
+alt Write fails
+  ProjectCtrl -> ProjectEntity : rollback(testCase.id)
+  activate ProjectEntity
+  ProjectEntity --> ProjectCtrl : rolledBack
+  deactivate ProjectEntity
+  ProjectCtrl --> TCForm : writeError()
+  TCForm --> User : showErrorMessage()
+else Write succeeds
+  ProjectCtrl -> ProjectEntity : writeSuiteFile(projectPath, suite)
+  activate ProjectEntity
+  ProjectEntity -> ProjectEntity : buildSuiteSpec()
+  ProjectEntity -> ProjectEntity : writeSuiteSpec()
+  ProjectEntity --> ProjectCtrl : result
+  deactivate ProjectEntity
+
+  ProjectCtrl --> TCForm : success
+  deactivate ProjectCtrl
+  TCForm --> User : showSavedSuccessfully()
+end
+
+@enduml
