@@ -488,15 +488,3 @@ See detailed screenshots grouped by module:
 - [UI Showcase](docs/screenshots.md)
 
 ---
-
-## Contributors
-
-| Name | Role |
-|---|---|
-| jeikai | Lead Developer |
-
----
-
-## License
-
-This project is for academic and internal use. Contact the project owner for licensing details.
