@@ -21,8 +21,6 @@ An AI-powered GUI platform for managing and automating tests with Katalon integr
 13. [Useful Commands](#useful-commands)
 14. [Notes & Gotchas](#notes--gotchas)
 15. [UI Screenshots](#ui-screenshots)
-16. [Contributors](#contributors)
-17. [License](#license)
 
 ---
 
