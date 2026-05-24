@@ -21,11 +21,11 @@ import axios from 'axios';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const FRONTEND_URL   = 'http://localhost:5173';
-const BACKEND_URL    = 'http://localhost:5000';
-const USERNAME       = 'admin';
-const PASSWORD       = 'admin123';
-const VIEWPORT       = { width: 1440, height: 900 };
+const FRONTEND_URL = 'http://localhost:5173';
+const BACKEND_URL = 'http://localhost:5000';
+const USERNAME = 'admin';
+const PASSWORD = 'admin123';
+const VIEWPORT = { width: 1440, height: 900 };
 const SCREENSHOT_DIR = path.resolve(__dirname, '../../docs/screenshots');
 const WAIT_AFTER_NAV = 1200; // ms to let React re-render settle
 
@@ -52,7 +52,7 @@ async function shot(page, subdir, name) {
 
 let authToken = null;
 let seededProjectId = null;
-let seededSuiteId   = null;
+let seededSuiteId = null;
 
 async function apiLogin() {
   try {
@@ -83,7 +83,7 @@ async function seedProject() {
     const res = await axios.post(`${BACKEND_URL}/api/projects/import`, {
       name: 'Demo QA Project',
       description: 'Sample project for documentation screenshots',
-      katalon_project_path: 'D:\\CodeThue\\yetiforce\\Yetiforce-GUI',
+      katalon_project_path: 'G:\QA-Studio-for-Yetiforce-UI-Testing',
     }, { headers: authHeaders() });
     seededProjectId = res.data.project.id;
     console.log(`  Created project id=${seededProjectId}`);
@@ -199,7 +199,7 @@ async function seedTestCases(projectId, suiteId) {
           `${BACKEND_URL}/api/projects/${projectId}/suites/${suiteId}/test-cases`,
           { test_case_id: tcId },
           { headers: authHeaders() }
-        ).catch(() => {});
+        ).catch(() => { });
       }
     } catch (err) {
       console.warn(`  Seed TC failed (${tc.name}):`, err.response?.data?.error || err.message);
@@ -245,7 +245,7 @@ async function main() {
   console.log('📦 Seeding demo data via backend API…');
   await apiLogin();
   const projectId = await seedProject();
-  const suiteId   = await seedSuite(projectId);
+  const suiteId = await seedSuite(projectId);
   await seedTestCases(projectId, suiteId);
 
   // Launch browser
@@ -259,8 +259,8 @@ async function main() {
   const page = await context.newPage();
 
   // Silence console noise from the app
-  page.on('console', () => {});
-  page.on('pageerror', () => {});
+  page.on('console', () => { });
+  page.on('pageerror', () => { });
 
   try {
     // ── 1. Login page ─────────────────────────────────────────────────────────
@@ -291,13 +291,13 @@ async function main() {
     // ── 3. Create project form — "Tạo Project mới" tab ───────────────────────
     console.log('  → Create project form');
     // Already on generate tab by default
-    await page.fill('input[placeholder="VD: QA_Automation_Core"]', 'MyNewProject').catch(() => {});
+    await page.fill('input[placeholder="VD: QA_Automation_Core"]', 'MyNewProject').catch(() => { });
     await pause(400);
     await shot(page, 'projects', 'create-project-form');
 
     // ── 4. Import project form ───────────────────────────────────────────────
     console.log('  → Import project form');
-    await page.locator('.project-mode-tab').filter({ hasText: 'Import Project' }).click().catch(() => {});
+    await page.locator('.project-mode-tab').filter({ hasText: 'Import Project' }).click().catch(() => { });
     await pause(600);
     await shot(page, 'projects', 'import-project-form');
 
@@ -305,7 +305,7 @@ async function main() {
     if (seededProjectId) {
       console.log('  → Project detail (edit mode)');
       // Click the first project in the list
-      await page.locator('.object-item').first().click().catch(() => {});
+      await page.locator('.object-item').first().click().catch(() => { });
       await pause(WAIT_AFTER_NAV);
       await shot(page, 'projects', 'project-detail-edit');
     }
@@ -326,7 +326,7 @@ async function main() {
 
     // Create new suite button
     console.log('  → New suite form');
-    await page.locator('button').filter({ hasText: 'Suite mới' }).click().catch(() => {});
+    await page.locator('button').filter({ hasText: 'Suite mới' }).click().catch(() => { });
     await pause(600);
     await shot(page, 'test-suites', 'create-suite-form');
 
@@ -359,18 +359,18 @@ async function main() {
 
     // New test case form
     console.log('  → New test case form');
-    await page.locator('button').filter({ hasText: 'Mới' }).click().catch(() => {});
+    await page.locator('button').filter({ hasText: 'Mới' }).click().catch(() => { });
     await pause(400);
-    await page.fill('input[placeholder="VD: Login happy path"]', 'TC-005: Verify dashboard widgets').catch(() => {});
+    await page.fill('input[placeholder="VD: Login happy path"]', 'TC-005: Verify dashboard widgets').catch(() => { });
     await pause(400);
     await shot(page, 'test-cases', 'manual-test-case-form');
 
     // Suite multi-select dropdown
     console.log('  → Suite link dropdown');
-    await page.locator('.suite-ms-trigger').click().catch(() => {});
+    await page.locator('.suite-ms-trigger').click().catch(() => { });
     await pause(500);
     await shot(page, 'test-cases', 'test-case-suite-link-dropdown');
-    await page.locator('.suite-ms-trigger').click().catch(() => {}); // close
+    await page.locator('.suite-ms-trigger').click().catch(() => { }); // close
 
     // ── 8. AI QA Studio ──────────────────────────────────────────────────────
     console.log('\n📸 [ai-qa-studio] AI QA Studio');
@@ -380,7 +380,7 @@ async function main() {
 
     // URL scanner section
     console.log('  → URL Scanner');
-    await page.locator('.studio-url-input, input[placeholder*="https://"]').first().fill('https://example.com').catch(() => {});
+    await page.locator('.studio-url-input, input[placeholder*="https://"]').first().fill('https://example.com').catch(() => { });
     await pause(400);
     await shot(page, 'ai-qa-studio', 'ai-studio-url-scanner');
 
@@ -473,7 +473,7 @@ async function main() {
   } catch (err) {
     console.error('\n❌ Screenshot capture error:', err.message);
     // Capture a "last-known-state" screenshot for debugging
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '_error-state.png') }).catch(() => {});
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '_error-state.png') }).catch(() => { });
     throw err;
   } finally {
     await browser.close();
