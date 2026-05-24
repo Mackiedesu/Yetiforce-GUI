@@ -1,12 +1,12 @@
 import { Bot, ClipboardList, BookOpen, FolderOpen, LayoutDashboard, Zap } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { id: 'home',       icon: FolderOpen,      label: 'Projects',    feature: '1' },
-  { id: 'tests',      icon: BookOpen,        label: 'Test Suites', feature: '2' },
-  { id: 'plans',      icon: ClipboardList,   label: 'Test Cases',  feature: '3' },
-  { id: 'studio',     icon: Bot,             label: 'AI QA Studio',feature: '4' },
-  { id: 'executions', icon: Zap,             label: 'Run Engine',  feature: '5' },
-  { id: 'analytics',  icon: LayoutDashboard, label: 'Dashboard',   feature: '6' },
+  { id: 'home', icon: FolderOpen, label: 'Projects', feature: '1' },
+  { id: 'tests', icon: BookOpen, label: 'Test Suites', feature: '2' },
+  { id: 'plans', icon: ClipboardList, label: 'Test Cases', feature: '3' },
+  { id: 'studio', icon: Bot, label: 'AI QA Studio', feature: '4' },
+  { id: 'executions', icon: Zap, label: 'Execution', feature: '5' },
+  { id: 'analytics', icon: LayoutDashboard, label: 'Dashboard', feature: '6' },
 ];
 
 const NavRail = ({ activeNav, onNavigate, katalonRunning, liveRunning }) => {
