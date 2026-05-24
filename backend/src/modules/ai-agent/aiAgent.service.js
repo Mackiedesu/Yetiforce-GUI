@@ -4,8 +4,8 @@ const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MODEL_CHAIN   = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-const MAX_RETRIES   = 3;
+const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1500;
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
@@ -46,17 +46,17 @@ async function callGeminiWithRetry(prompt) {
 function normalizeTestCases(raw) {
   const list = Array.isArray(raw) ? raw : [];
   return list.map((tc) => ({
-    name:           String(tc.name || 'Unnamed Test Case'),
-    description:    String(tc.description || ''),
-    steps:          Array.isArray(tc.steps) ? tc.steps.map((s) => ({
-      title:           String(s.title || ''),
-      description:     String(s.description || ''),
+    name: String(tc.name || 'Unnamed Test Case'),
+    description: String(tc.description || ''),
+    steps: Array.isArray(tc.steps) ? tc.steps.map((s) => ({
+      title: String(s.title || ''),
+      description: String(s.description || ''),
       expected_result: String(s.expected_result || ''),
     })) : [],
     expectedResult: String(tc.expectedResult || ''),
-    testData:       (tc.testData && typeof tc.testData === 'object') ? tc.testData : {},
+    testData: (tc.testData && typeof tc.testData === 'object') ? tc.testData : {},
     // Store Playwright spec content in katalonScript field for DB backward compat
-    katalonScript:  String(tc.playwrightScript || tc.katalonScript || ''),
+    katalonScript: String(tc.playwrightScript || tc.katalonScript || ''),
     objectLocators: Array.isArray(tc.objectLocators) ? tc.objectLocators : [],
   }));
 }
@@ -83,7 +83,7 @@ QUY TẮC CHO playwrightScript (Playwright + Mocha + Chai):
 2. DÙNG: page.goto(), page.fill(), page.click(), page.waitForSelector(), page.screenshot()
 3. ASSERT: expect(value).to.equal() / to.include() / to.be.true / to.not.be.empty
 4. SCREENSHOT: await page.screenshot({ path: path.join(__dirname, '../../screenshots', 'step.png') })
-5. WAIT: await page.waitForLoadState('networkidle') sau navigation
+5. WAIT: Dùng await page.waitForLoadState('load') hoặc chờ selector xuất hiện bằng await page.waitForSelector('selector') — TUYỆT ĐỐI KHÔNG dùng 'networkidle' vì Yetiforce có các request ngầm chạy liên tục dễ khiến test bị treo vô hạn.
 6. SELECTOR: Dùng CSS (#id, .class) hoặc XPath từ danh sách phần tử ở trên — KHÔNG tự đặt selector mới
 7. XUỐNG DÒNG: dùng \\n trong chuỗi JSON
 8. KHÔNG import / require trong script (đã có ở wrapper)
@@ -140,7 +140,7 @@ Trả về JSON hợp lệ, không giải thích thêm.
 `;
 
   const response = await callGeminiWithRetry(prompt);
-  const parsed   = parseAiJson(response.text);
+  const parsed = parseAiJson(response.text);
   return { testCases: normalizeTestCases(parsed.testCases) };
 }
 
@@ -227,7 +227,7 @@ Trả về JSON hợp lệ, không giải thích thêm.
 `;
 
   const response = await callGeminiWithRetry(prompt);
-  const parsed   = parseAiJson(response.text);
+  const parsed = parseAiJson(response.text);
   return { testCases: normalizeTestCases(parsed.testCases) };
 }
 
