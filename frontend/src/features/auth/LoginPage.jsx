@@ -36,7 +36,7 @@ const LoginPage = ({ onLogin }) => {
             <rect width="40" height="40" rx="10" fill="#5865F2" />
             <path d="M12 20L18 26L28 14" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="login-brand">YetiForce GUI</span>
+          <span className="login-brand">QA Studio</span>
         </div>
 
         <h2 className="login-title">Sign in to your account</h2>

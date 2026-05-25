@@ -15,7 +15,7 @@
  * (kept as best-effort, not required for execution).
  */
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,8 +43,8 @@ function escapeJs(str) {
 function isCompleteSpec(script) {
   const s = String(script || '').trim();
   return s.startsWith('const ') || s.startsWith('require(') ||
-         s.startsWith('import ') || s.startsWith("'use strict'") ||
-         /^describe\s*\(/.test(s);
+    s.startsWith('import ') || s.startsWith("'use strict'") ||
+    /^describe\s*\(/.test(s);
 }
 
 /**
@@ -153,22 +153,24 @@ ${requires || '// No test cases linked yet.'}
 function writeTestCaseFile(projectPath, tcName, opts = {}) {
   try {
     if (!projectPath || !tcName) {
-      return { specFilePath: null, tcFilePath: null, scriptPath: null,
-               diskError: 'Missing projectPath or test case name' };
+      return {
+        specFilePath: null, tcFilePath: null, scriptPath: null,
+        diskError: 'Missing projectPath or test case name'
+      };
     }
 
-    const safeName   = sanitizeFilename(tcName);
-    const casesDir   = path.join(projectPath, 'tests', 'cases');
-    const specPath   = path.join(casesDir, `${safeName}.spec.js`);
+    const safeName = sanitizeFilename(tcName);
+    const casesDir = path.join(projectPath, 'tests', 'cases');
+    const specPath = path.join(casesDir, `${safeName}.spec.js`);
 
     fs.mkdirSync(casesDir, { recursive: true });
     fs.writeFileSync(specPath, buildTestCaseSpec(tcName, opts), 'utf8');
 
     return {
       specFilePath: specPath,
-      tcFilePath:   specPath, // alias for backward compat
-      scriptPath:   specPath,
-      diskError:    null,
+      tcFilePath: specPath, // alias for backward compat
+      scriptPath: specPath,
+      diskError: null,
     };
   } catch (err) {
     return { specFilePath: null, tcFilePath: null, scriptPath: null, diskError: err.message };
@@ -187,9 +189,9 @@ function writeTestSuiteFile(projectPath, suiteName, opts = {}) {
       return { tsFilePath: null, diskError: 'Missing projectPath or suite name' };
     }
 
-    const safeName  = sanitizeFilename(suiteName);
+    const safeName = sanitizeFilename(suiteName);
     const suitesDir = path.join(projectPath, 'tests', 'suites');
-    const specPath  = path.join(suitesDir, `${safeName}.spec.js`);
+    const specPath = path.join(suitesDir, `${safeName}.spec.js`);
 
     fs.mkdirSync(suitesDir, { recursive: true });
     fs.writeFileSync(specPath, buildSuiteSpec(suiteName, opts), 'utf8');
@@ -215,17 +217,17 @@ function writeObjectRepositoryFile(projectPath, objectPath, opts = {}) {
     const parts = String(objectPath).replace(/\\/g, '/').split('/').map((p) => p.trim()).filter(Boolean);
     if (parts.length === 0) return { rsFilePath: null, diskError: 'Invalid objectPath' };
 
-    const objectName  = parts[parts.length - 1];
+    const objectName = parts[parts.length - 1];
     const folderParts = parts.slice(0, -1);
-    const dir         = path.join(projectPath, 'tests', 'locators', ...folderParts);
-    const filePath    = path.join(dir, `${objectName}.json`);
+    const dir = path.join(projectPath, 'tests', 'locators', ...folderParts);
+    const filePath = path.join(dir, `${objectName}.json`);
 
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify({
-      name:           objectName,
+      name: objectName,
       selectorMethod: opts.selectorMethod || 'XPATH',
-      selectorValue:  opts.selectorValue  || '',
-      description:    opts.description    || '',
+      selectorValue: opts.selectorValue || '',
+      description: opts.description || '',
     }, null, 2), 'utf8');
 
     return { rsFilePath: filePath, diskError: null };

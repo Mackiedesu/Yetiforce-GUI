@@ -10,24 +10,24 @@ import { scanProjectSuites } from '../suites/suites.api';
 import { deleteExecution, getExecution, listExecutions, startExecution } from './executions.api';
 import PathPickerInput from '../../components/PathPickerInput';
 
-const BROWSERS    = ['Chrome', 'Firefox', 'Edge', 'Chrome (headless)', 'Firefox (headless)'];
-const PROFILES    = ['default', 'dev', 'staging', 'production'];
-const OS_OPTIONS  = ['Windows', 'macOS', 'Linux'];
+const BROWSERS = ['Chrome', 'Firefox', 'Edge', 'Chrome (headless)', 'Firefox (headless)'];
+const PROFILES = ['default', 'dev', 'staging', 'production'];
+const OS_OPTIONS = ['Windows', 'macOS', 'Linux'];
 
 const STATUS_META = {
-  running:  { label: 'RUNNING',  cls: 'kat-status-running'  },
-  passed:   { label: 'PASSED',   cls: 'kat-status-passed'   },
-  failed:   { label: 'FAILED',   cls: 'kat-status-failed'   },
-  error:    { label: 'ERROR',    cls: 'kat-status-error'     },
-  pending:  { label: 'PENDING',  cls: 'kat-status-pending'  },
+  running: { label: 'RUNNING', cls: 'kat-status-running' },
+  passed: { label: 'PASSED', cls: 'kat-status-passed' },
+  failed: { label: 'FAILED', cls: 'kat-status-failed' },
+  error: { label: 'ERROR', cls: 'kat-status-error' },
+  pending: { label: 'PENDING', cls: 'kat-status-pending' },
 };
 
 // Per-test-case status
 const TC_STATUS_META = {
-  PASSED:     { cls: 'tc-s-passed',     label: 'PASSED'     },
-  FAILED:     { cls: 'tc-s-failed',     label: 'FAILED'     },
-  ERROR:      { cls: 'tc-s-error',      label: 'ERROR'      },
-  SKIPPED:    { cls: 'tc-s-skipped',    label: 'SKIPPED'    },
+  PASSED: { cls: 'tc-s-passed', label: 'PASSED' },
+  FAILED: { cls: 'tc-s-failed', label: 'FAILED' },
+  ERROR: { cls: 'tc-s-error', label: 'ERROR' },
+  SKIPPED: { cls: 'tc-s-skipped', label: 'SKIPPED' },
   INCOMPLETE: { cls: 'tc-s-incomplete', label: 'INCOMPLETE' },
 };
 
@@ -56,7 +56,7 @@ function TcStatusBadge({ status }) {
 
 function formatDuration(ms) {
   if (!ms) return '—';
-  if (ms < 1000)  return `${ms}ms`;
+  if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   const m = Math.floor(ms / 60000);
   const s = Math.floor((ms % 60000) / 1000);
@@ -78,26 +78,26 @@ function suiteName(run) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 const ExecutionsTab = ({ katalonWsEvent, initialRunId, onInitialRunConsumed, onOpenDashboard }) => {
-  const [runs, setRuns]                     = useState([]);
-  const [selectedRunId, setSelectedRunId]   = useState(null);
+  const [runs, setRuns] = useState([]);
+  const [selectedRunId, setSelectedRunId] = useState(null);
   const [selectedRunDetail, setSelectedRunDetail] = useState(null);
-  const [showForm, setShowForm]             = useState(false);
-  const [loadingRuns, setLoadingRuns]       = useState(false);
-  const [loadingDetail, setLoadingDetail]   = useState(false);
-  const [submitting, setSubmitting]         = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [loadingRuns, setLoadingRuns] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [config, setConfig]     = useState(EMPTY_CONFIG);
+  const [config, setConfig] = useState(EMPTY_CONFIG);
   const [projects, setProjects] = useState([]);
 
-  const [suiteTree, setSuiteTree]         = useState(null);
+  const [suiteTree, setSuiteTree] = useState(null);
   const [testSuitesPath, setTestSuitesPath] = useState('');
-  const [scanningTree, setScanningTree]   = useState(false);
+  const [scanningTree, setScanningTree] = useState(false);
   const [treeScanError, setTreeScanError] = useState('');
 
   // Live execution tracking
-  const [liveRunId, setLiveRunId]       = useState(null);
-  const [liveLogs, setLiveLogs]         = useState([]);
-  const [liveStatus, setLiveStatus]     = useState(null);
+  const [liveRunId, setLiveRunId] = useState(null);
+  const [liveLogs, setLiveLogs] = useState([]);
+  const [liveStatus, setLiveStatus] = useState(null);
   const logEndRef = useRef(null);
 
   // ── Data fetching ───────────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ const ExecutionsTab = ({ katalonWsEvent, initialRunId, onInitialRunConsumed, onO
       default:
         break;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [katalonWsEvent]);
 
   // ── Project / suite selection ───────────────────────────────────────────────
@@ -208,7 +208,7 @@ const ExecutionsTab = ({ katalonWsEvent, initialRunId, onInitialRunConsumed, onO
     setLiveStatus('running');
     setShowForm(false);
     try {
-      const data   = await startExecution(config);
+      const data = await startExecution(config);
       const newRun = data.run;
       setLiveRunId(newRun.id);
       setSelectedRunId(newRun.id);
@@ -231,7 +231,7 @@ const ExecutionsTab = ({ katalonWsEvent, initialRunId, onInitialRunConsumed, onO
     setSelectedRunId(initialRunId);
     fetchDetail(initialRunId);
     onInitialRunConsumed?.();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRunId]);
 
   async function handleSelectRun(run) {
@@ -246,7 +246,7 @@ const ExecutionsTab = ({ katalonWsEvent, initialRunId, onInitialRunConsumed, onO
     await deleteExecution(id);
     setRuns((prev) => prev.filter((r) => r.id !== id));
     if (selectedRunId === id) { setSelectedRunId(null); setSelectedRunDetail(null); }
-    if (liveRunId === id)     { setLiveRunId(null);     setLiveLogs([]); }
+    if (liveRunId === id) { setLiveRunId(null); setLiveLogs([]); }
   }
 
   function handleNewExecution() {
@@ -492,7 +492,7 @@ const ExecutionsTab = ({ katalonWsEvent, initialRunId, onInitialRunConsumed, onO
                   node mocha \<br />
                   {'  '}"{config.suite_path ? `tests/suites/${config.suite_path.split(/[/\\]/).pop()}.spec.js` : 'tests/suites/<suite>.spec.js'}" \<br />
                   {'  '}--reporter mochawesome \<br />
-                  {'  '}--timeout 30000 --exit
+                  {'  '}--timeout 60000 --exit
                 </code>
               </div>
 
@@ -604,17 +604,17 @@ function LiveLogPanel({ logs, status, logEndRef, onClose }) {
 
 /* ────────────────── Test Cases Tab ────────────────── */
 function TestCasesTab({ testCaseDetails, parseWarning, totalFromRun, passedFromRun, failedFromRun }) {
-  const [filter, setFilter]           = useState('all');
+  const [filter, setFilter] = useState('all');
   const [expandedRows, setExpandedRows] = useState(new Set());
 
   const details = testCaseDetails || [];
 
   const counts = {
-    all:        details.length,
-    passed:     details.filter((tc) => tc.status === 'PASSED').length,
-    failed:     details.filter((tc) => tc.status === 'FAILED').length,
-    error:      details.filter((tc) => tc.status === 'ERROR').length,
-    skipped:    details.filter((tc) => tc.status === 'SKIPPED').length,
+    all: details.length,
+    passed: details.filter((tc) => tc.status === 'PASSED').length,
+    failed: details.filter((tc) => tc.status === 'FAILED').length,
+    error: details.filter((tc) => tc.status === 'ERROR').length,
+    skipped: details.filter((tc) => tc.status === 'SKIPPED').length,
     incomplete: details.filter((tc) => tc.status === 'INCOMPLETE').length,
   };
 
@@ -674,12 +674,12 @@ function TestCasesTab({ testCaseDetails, parseWarning, totalFromRun, passedFromR
 
       <div className="tc-filter-bar">
         {[
-          ['all',        'Tất cả',    counts.all],
-          ['passed',     'Passed',    counts.passed],
-          ['failed',     'Failed',    counts.failed],
-          ['error',      'Error',     counts.error],
-          ['skipped',    'Skipped',   counts.skipped],
-          ['incomplete', 'Incomplete',counts.incomplete],
+          ['all', 'Tất cả', counts.all],
+          ['passed', 'Passed', counts.passed],
+          ['failed', 'Failed', counts.failed],
+          ['error', 'Error', counts.error],
+          ['skipped', 'Skipped', counts.skipped],
+          ['incomplete', 'Incomplete', counts.incomplete],
         ].filter(([key]) => key === 'all' || counts[key] > 0)
           .map(([key, label, count]) => (
             <button
@@ -828,17 +828,17 @@ function RunDetailPanel({ run, onClose }) {
   // Auto-switch to test cases tab for passed runs (Bug 3: no logs needed for success)
   const [activeTab, setActiveTab] = useState(run.status === 'passed' ? 'testcases' : 'logs');
 
-  const suite   = suiteName(run);
-  const total   = run.total_tests   || 0;
-  const passed  = run.passed_tests  || 0;
-  const failed  = run.failed_tests  || 0;
+  const suite = suiteName(run);
+  const total = run.total_tests || 0;
+  const passed = run.passed_tests || 0;
+  const failed = run.failed_tests || 0;
   const skipped = run.skipped_tests || 0;
-  const errored = run.error_tests   || 0;
+  const errored = run.error_tests || 0;
 
   const passRate = total > 0 ? Math.round((passed / total) * 100) : null;
 
   const tcDetails = run.testCaseDetails || [];
-  const hasTcs    = tcDetails.length > 0;
+  const hasTcs = tcDetails.length > 0;
 
   return (
     <div className="kat-detail-panel">
@@ -867,7 +867,7 @@ function RunDetailPanel({ run, onClose }) {
                   width: `${passRate}%`,
                   background: passRate >= 100 ? 'var(--success-color)'
                     : passRate < 50 ? 'var(--error-color)'
-                    : 'var(--warning-color)',
+                      : 'var(--warning-color)',
                 }}
               />
             </div>
@@ -1006,16 +1006,16 @@ function RunDetailPanel({ run, onClose }) {
       {activeTab === 'config' && (
         <div className="kat-config-view">
           {[
-            ['Suite Name',   suite],
-            ['Suite Path',   run.suite_path],
-            ['Project',      run.project_name || '—'],
+            ['Suite Name', suite],
+            ['Suite Path', run.suite_path],
+            ['Project', run.project_name || '—'],
             ['Project Path', run.project_path],
-            ['Browser',      run.browser],
-            ['OS',           run.os || '—'],
-            ['Profile',      run.profile],
-            ['Engine',       'Mocha + Playwright'],
-            ['Exit Code',    run.exit_code != null ? String(run.exit_code) : '—'],
-            ['Report Path',  run.report_path || '—'],
+            ['Browser', run.browser],
+            ['OS', run.os || '—'],
+            ['Profile', run.profile],
+            ['Engine', 'Mocha + Playwright'],
+            ['Exit Code', run.exit_code != null ? String(run.exit_code) : '—'],
+            ['Report Path', run.report_path || '—'],
           ].map(([label, val]) => (
             <div key={label} className="kat-config-row">
               <span className="kat-config-label">{label}</span>
